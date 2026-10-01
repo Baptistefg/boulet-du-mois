@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photos - Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="photos">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$, esc = App.esc;
+  var viewKey = App.currentKey();
+  var uploader = App.getVoter() || App.PEOPLE[0].n;
+  var pending = [];
+  var caption = "";
+
+  function cardHTML(p, ctx) {
+    var pp = App.person(p.who);
+    var isWin = ctx.finished && ctx.results.winners.some(function (w) { return w.id === p.id; });
+    var btn = "";
+    if (ctx.voteOpen) {
+      var mine = ctx.voter && App.myVote(viewKey, ctx.voter) === p.id;
+      var own = ctx.voter && p.who === ctx.voter;
+      btn = '<button class="vote-btn ' + (mine ? 'on' : '') + '" data-vote="' + p.id + '" ' + (own ? 'disabled' : '') + '>' +
+        (own ? 'Ta photo' : mine ? 'Ton vote' : 'Voter pour cette photo') + '</button>';
+    }
+    return '<div class="ph ' + (isWin ? 'win' : '') + '">' +
+      (isWin ? '<div class="badge">' + App.crownInline + 'Photo du mois</div>' : '') +
+      '<button class="x del" data-del="' + p.id + '" title="Supprimer">×</button>' +
+      '<div class="img" data-open="' + p.id + '"><img src="' + p.data + '" alt=""></div>' +
+      '<div class="meta">' +
+        '<div class="by">' + App.av(pp) + esc(p.who) + '</div>' +
+        (p.caption ? '<div class="cap">' + esc(p.caption) + '</div>' : '') +
+        (ctx.finished ? '<div class="votes">' + App.plural(ctx.results.scores[p.id] || 0, "vote") + '</div>' : '') +
+        btn +
+      '</div></div>';
+  }
+
+  function render() {
+    var cur = App.currentKey();
+    var isCur = viewKey === cur;
+    var finished = viewKey < cur;
+    var voteOpen = isCur && App.isVoteOpen();
+    var voter = App.getVoter();
+    var list = App.photosOf(viewKey);
+    var results = App.photoResults(viewKey);
+    var photoKeys = App.photos.map(App.photoKey);
+    var ctx = { finished: finished, results: results, voteOpen: voteOpen, voter: voter };
+
+    var html =
+      '<section class="hero">' +
+        '<span class="eyebrow">Concours photo</span>' +
+        '<h1>Photos</h1>' +
+        '<p>Ajoute tes photos du mois. Vote ' + App.voteWindow() + ', annonce le ' + App.CYCLE_DAY + '.</p>' +
+      '</section>';
+
+    if (isCur) {
+      html +=
+        '<section class="glass">' +
+          '<h2>Ajouter une photo</h2>' +
+          '<div class="pick">' + App.PEOPLE.map(function (p) {
+            return '<button type="button" class="chip ' + (uploader === p.n ? 'on' : '') + '" data-up="' + p.n + '">' + App.av(p) + p.n +
+              ' <small>' + App.photoCount(cur, p.n) + '/' + App.MAX_PHOTOS + '</small></button>';
+          }).join("") + '</div>' +
+          '<label class="drop" id="drop"><input type="file" id="file" accept="image/*" multiple>' +
+            '<b>Clique ici</b> ou glisse tes photos<br><span style="font-size:.85rem">Elles sont réduites automatiquement. Maximum ' + App.MAX_PHOTOS + ' photos par personne et par cycle.</span></label>' +
+          (pending.length ? '<div class="previews" id="prev"></div>' : '') +
+          '<div class="row-input">' +
+            '<input type="text" id="cap" placeholder="Légende (optionnel)" maxlength="120" value="' + esc(caption) + '">' +
+            '<button class="btn" id="up">Publier' + (pending.length ? ' (' + pending.length + ')' : '') + '</button>' +
+          '</div>' +
+        '</section>';
+    }
+
+    html += '<section class="glass"><div class="head-row"><h2>Galerie</h2>' + App.cycleOptions(viewKey, photoKeys) + '</div>' +
+      '<p class="muted" style="margin:-8px 0 14px;font-size:.9rem">Cycle ' + App.cycleRange(viewKey) + '. ' + App.plural(list.length, "photo") + '.</p>';
+
+    if (voteOpen) {
+      html += '<div class="notice">Le vote est ouvert. Choisis qui tu es, puis vote pour une photo (pas la tienne). Tu peux changer ton vote jusqu\'à la clôture. Les résultats restent cachés jusqu\'au ' + App.CYCLE_DAY + '.' +
+        '<div class="pick" style="margin:12px 0 0">' + App.PEOPLE.map(function (p) {
+          return '<button type="button" class="chip ' + (voter === p.n ? 'on' : '') + '" data-voter="' + p.n + '">' + App.av(p) + p.n + '</button>';
+        }).join("") + '</div></div>';
+    } else if (isCur) {
+      html += '<div class="notice">Le vote s\'ouvre le ' + App.VOTE_FROM + ' et se termine le ' + (App.CYCLE_DAY - 1) + '. Les résultats seront annoncés le ' + App.CYCLE_DAY + '.</div>';
+    } else if (finished && results.winners.length) {
+      var names = results.winners.map(function (p) { return p.who; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(" & ");
+      html += '<div class="notice">Photo du mois : <b>' + esc(names) + '</b> avec ' + App.plural(results.max, "vote") + '.</div>';
+    } else if (finished) {
+      html += '<div class="notice">Aucun vote enregistré sur ce cycle.</div>';
+    }
+
+    html += list.length
+      ? '<div class="gallery">' + list.map(function (p) { return cardHTML(p, ctx); }).join("") + '</div>'
+      : '<div class="empty">Aucune photo sur ce cycle.</div>';
+    html += '</section>';
+
+    if (isCur) {
+      html += '<section class="glass"><h2>Test</h2><div class="toolbar">' +
+        '<button class="btn ghost" id="force">' + (App.force[cur] ? 'Fermer le vote (test)' : 'Ouvrir le vote maintenant (test)') + '</button>' +
+        '<span class="muted" style="font-size:.85rem">Pour essayer le vote avant le ' + App.VOTE_FROM + '.</span></div></section>';
+    }
+
+    $("app").innerHTML = html;
+
+    // Sélecteur de cycle
+    $("cycleSel").onchange = function () { viewKey = this.value; render(); };
+
+    // Ajout
+    if (isCur) {
+      document.querySelectorAll("[data-up]").forEach(function (c) { c.onclick = function () { uploader = c.dataset.up; caption = $("cap").value; render(); }; });
+      var file = $("file"), drop = $("drop");
+      file.onchange = function () { pending = pending.concat(Array.prototype.slice.call(file.files)); caption = $("cap").value; render(); };
+      drop.ondragover = function (e) { e.preventDefault(); drop.classList.add("over"); };
+      drop.ondragleave = function () { drop.classList.remove("over"); };
+      drop.ondrop = function (e) {
+        e.preventDefault(); drop.classList.remove("over");
+        pending = pending.concat(Array.prototype.slice.call(e.dataTransfer.files));
+        caption = $("cap").value; render();
+      };
+      if (pending.length) {
+        var prev = $("prev");
+        pending.forEach(function (f) { var im = document.createElement("img"); im.src = URL.createObjectURL(f); prev.appendChild(im); });
+      }
+      $("up").onclick = async function () {
+        caption = $("cap").value.trim();
+        if (!pending.length) { App.toast("Choisis au moins une photo"); return; }
+        var btn = $("up"); btn.disabled = true; btn.textContent = "Envoi en cours...";
+        var ok = 0, err = null;
+        for (var i = 0; i < pending.length; i++) {
+          try { await App.addPhoto(uploader, caption, pending[i]); ok++; }
+          catch (e) { err = e.message; break; }
+        }
+        pending = []; caption = "";
+        render();
+        App.toast(err ? (ok ? ok + " ajoutée(s). " : "") + err : App.plural(ok, "photo") + " ajoutée" + (ok > 1 ? "s" : "") + " pour " + uploader);
+      };
+      $("force").onclick = function () {
+        if (App.force[cur]) delete App.force[cur]; else App.force[cur] = true;
+        App.saveForce(); render();
+      };
+    }
+
+    // Vote
+    document.querySelectorAll("[data-voter]").forEach(function (c) { c.onclick = function () { App.setVoter(c.dataset.voter); render(); }; });
+    document.querySelectorAll("[data-vote]").forEach(function (b) {
+      b.onclick = function () {
+        if (!App.getVoter()) { App.toast("Choisis d'abord qui tu es"); return; }
+        if (App.castVote(viewKey, App.getVoter(), b.dataset.vote)) { App.toast("Vote enregistré pour " + App.getVoter()); render(); }
+      };
+    });
+
+    // Lightbox et suppression
+    document.querySelectorAll("[data-open]").forEach(function (el) {
+      el.onclick = function () {
+        var p = App.photos.find(function (x) { return x.id === el.dataset.open; });
+        if (p) App.lightbox(p.data, p.who + (p.caption ? " : " + p.caption : ""));
+      };
+    });
+    document.querySelectorAll("[data-del]").forEach(function (b) {
+      b.onclick = async function () {
+        if (confirm("Supprimer cette photo ?")) { await App.delPhoto(b.dataset.del); render(); }
+      };
+    });
+  }
+  render();
+});
+</script>
+</body>
+</html>

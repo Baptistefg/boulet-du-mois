@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actions - Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="actions">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$;
+  var viewKey = App.currentKey();
+  var formWho = App.PEOPLE[0].n;
+  var filter = "all";
+
+  function render() {
+    var cur = App.currentKey();
+    var isCur = viewKey === cur;
+    var all = App.actionsOf(viewKey);
+    var list = filter === "all" ? all : all.filter(function (a) { return a.who === filter; });
+    var s = App.scoresFor(viewKey);
+
+    $("app").innerHTML =
+      '<section class="hero">' +
+        '<span class="eyebrow">Mauvaises actions</span>' +
+        '<h1>Actions</h1>' +
+        '<p>Chaque action doit avoir une justification.</p>' +
+      '</section>' +
+
+      (isCur
+        ? '<section class="glass">' +
+            '<h2>Nouvelle mauvaise action</h2>' +
+            '<div class="pick">' + App.PEOPLE.map(function (p) {
+              return '<button type="button" class="chip ' + (formWho === p.n ? 'on' : '') + '" data-who="' + p.n + '">' + App.av(p) + p.n + '</button>';
+            }).join("") + '</div>' +
+            '<form id="form" class="row-input">' +
+              '<input type="text" id="why" placeholder="Qu\'est-ce qu\'il a fait ? (justification obligatoire)" maxlength="200" required autocomplete="off">' +
+              '<button class="btn" type="submit">Ajouter</button>' +
+            '</form>' +
+          '</section>'
+        : '') +
+
+      '<section class="glass">' +
+        '<div class="head-row"><h2>Historique</h2>' + App.cycleOptions(viewKey) + '</div>' +
+        '<p class="muted" style="margin:-8px 0 14px;font-size:.9rem">Cycle ' + App.cycleRange(viewKey) + '. ' + App.plural(all.length, "action") + '.</p>' +
+        '<div class="tabs">' +
+          '<button class="tab ' + (filter === "all" ? "on" : "") + '" data-f="all">Tous</button>' +
+          App.PEOPLE.map(function (p) {
+            return '<button class="tab ' + (filter === p.n ? "on" : "") + '" data-f="' + p.n + '">' + p.n + ' (' + s[p.n] + ')</button>';
+          }).join("") +
+        '</div>' +
+        '<div class="feed">' + (list.length
+          ? list.map(function (a) { return App.actionItemHTML(a, true); }).join("")
+          : '<div class="empty">Rien à afficher ici.</div>') + '</div>' +
+      '</section>';
+
+    document.querySelectorAll(".chip").forEach(function (c) {
+      c.onclick = function () {
+        formWho = c.dataset.who;
+        document.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x.dataset.who === formWho); });
+      };
+    });
+    if ($("form")) $("form").onsubmit = function (e) {
+      e.preventDefault();
+      var why = $("why").value.trim();
+      if (!why) return;
+      App.addAction(formWho, why);
+      App.toast("Action ajoutée pour " + formWho);
+      render();
+    };
+    document.querySelectorAll(".tab").forEach(function (t) { t.onclick = function () { filter = t.dataset.f; render(); }; });
+    $("cycleSel").onchange = function () { viewKey = this.value; filter = "all"; render(); };
+    document.querySelectorAll("[data-del]").forEach(function (b) {
+      b.onclick = function () {
+        if (confirm("Supprimer cette action ?")) { App.delAction(b.dataset.del); render(); }
+      };
+    });
+  }
+  render();
+});
+</script>
+</body>
+</html>

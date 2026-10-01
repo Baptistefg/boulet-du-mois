@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palmarès - Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="hof">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$, esc = App.esc;
+  var year = null;
+
+  function render() {
+    var keys = App.finishedKeys();
+    var years = App.years();
+    if (!year || years.indexOf(year) < 0) year = String(new Date().getFullYear());
+    var titles = App.yearTitles(year);
+    var ptitles = App.yearPhotoTitles(year);
+    var anyT = Object.values(titles).some(function (v) { return v > 0; });
+    var anyP = Object.values(ptitles).some(function (v) { return v > 0; });
+
+    $("app").innerHTML =
+      '<section class="hero"><span class="eyebrow">Hall of shame</span><h1>Palmarès</h1><p>Tous les boulets et toutes les photos qui ont marqué l\'histoire.</p></section>' +
+
+      '<section class="glass">' +
+        '<h2>Classement de l\'année</h2>' +
+        '<div class="tabs">' + years.map(function (y) { return '<button class="tab ' + (y === year ? 'on' : '') + '" data-y="' + y + '">' + y + '</button>'; }).join("") + '</div>' +
+        '<p class="muted" style="margin:0 0 8px;font-size:.9rem">Titres de Boulet du mois</p>' +
+        (anyT ? App.rankRows(titles, { pos: true, unit: "titre" }) : '<div class="empty">Aucun titre décerné en ' + year + ' pour le moment.</div>') +
+        '<p class="muted" style="margin:18px 0 8px;font-size:.9rem">Photos du mois gagnées</p>' +
+        (anyP ? App.rankRows(ptitles, { pos: true, unit: "victoire", alt: true }) : '<div class="empty">Aucune photo élue en ' + year + ' pour le moment.</div>') +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<h2>Les élus, cycle par cycle</h2>' +
+        (keys.length ? keys.map(function (k) {
+          var r = App.winnersOf(k), p = App.person(r.names[0]);
+          var pr = App.photoResults(k), ph = pr.winners[0];
+          return '<div class="hof">' + (p ? App.av(p) : '') +
+            '<div class="mo">' + App.monthName(k) + '</div>' +
+            '<div class="wn"><b>' + (r.names.join(" & ") || "Aucun") + '</b>' +
+              '<div class="nt">' + (r.note ? '« ' + esc(r.note) + ' »' : r.max ? App.plural(r.max, "action") : '') + '</div>' +
+              (ph ? '<div class="nt">Photo du mois : ' + esc(pr.winners.map(function (x) { return x.who; }).join(" & ")) + ' (' + App.plural(pr.max, "vote") + ')</div>' : '') +
+            '</div>' +
+            (ph ? '<img class="ph-mini" src="' + ph.data + '" data-pid="' + ph.id + '" alt="">' : '') +
+          '</div>';
+        }).join("") : '<div class="empty">Aucun cycle terminé pour le moment.</div>') +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<h2>Outils</h2>' +
+        '<div class="toolbar">' +
+          '<button class="btn ghost" id="pb">Tester l\'animation Boulet (cycle en cours)</button>' +
+          '<button class="btn ghost" id="pp">Tester l\'animation Photo (cycle en cours)</button>' +
+          '<button class="btn ghost" id="exp">Exporter les données</button>' +
+          '<button class="btn ghost" id="imp">Importer des données</button>' +
+          '<input type="file" id="file" accept="application/json" hidden>' +
+        '</div>' +
+        '<p class="muted" style="font-size:.85rem;margin:12px 0 0">Les données sont stockées dans le navigateur. L\'export contient aussi les photos et les votes.</p>' +
+      '</section>';
+
+    document.querySelectorAll(".tab").forEach(function (t) { t.onclick = function () { year = t.dataset.y; render(); }; });
+    document.querySelectorAll("[data-pid]").forEach(function (im) {
+      im.onclick = function () {
+        var p = App.photos.find(function (x) { return x.id === im.dataset.pid; });
+        if (p) App.lightbox(p.data, p.who + (p.caption ? " : " + p.caption : ""));
+      };
+    });
+    $("pb").onclick = function () { App.showReveal(App.currentKey(), false, render); };
+    $("pp").onclick = function () { App.showPhotoReveal(App.currentKey(), false, render); };
+    $("exp").onclick = App.exportAll;
+    $("imp").onclick = function () { $("file").click(); };
+    $("file").onchange = function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = async function () {
+        try {
+          JSON.parse(rd.result);
+          if (confirm("Remplacer toutes les données actuelles par celles du fichier ?")) {
+            await App.importAll(rd.result); App.toast("Données importées"); render();
+          }
+        } catch (err) { alert("Fichier invalide."); }
+      };
+      rd.readAsText(f);
+    };
+  }
+  render();
+});
+</script>
+</body>
+</html>

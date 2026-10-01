@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="home">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$, esc = App.esc;
+
+  function render() {
+    var cur = App.currentKey();
+    var s = App.scoresFor(cur);
+    var w = App.winnersOf(cur);
+    var hasAny = Object.values(s).some(function (v) { return v > 0; });
+    var acts = App.actionsOf(cur);
+    var photos = App.photosOf(cur);
+    var voteOpen = App.isVoteOpen();
+    var year = String(new Date().getFullYear());
+    var titles = App.yearTitles(year);
+    var anyTitle = Object.values(titles).some(function (v) { return v > 0; });
+
+    var leader = hasAny ? w.names.join(" & ") : "Personne";
+    var leaderSub = hasAny ? App.plural(w.max, "action") : "Pas encore d'action ce cycle";
+
+    $("app").innerHTML =
+      '<section class="hero">' +
+        '<span class="eyebrow">Édition ' + App.monthName(cur) + '</span>' +
+        '<h1>Boulet du mois</h1>' +
+        '<p>Cycle en cours : ' + App.cycleRange(cur) + '.</p>' +
+      '</section>' +
+
+      '<section class="glass countdown">' +
+        '<h2>Prochaine annonce le ' + App.CYCLE_DAY + ' ' + App.monthLower(cur) + '</h2>' +
+        '<div class="digits" id="digits"></div>' +
+        '<div class="progress"><div id="prog" style="width:0"></div></div>' +
+        '<div style="margin-top:14px">' +
+          (voteOpen
+            ? '<span class="pill live">Vote photo ouvert</span> <a class="more" href="photos.html">Voter maintenant</a>'
+            : '<span class="pill">Vote photo ' + App.voteWindow() + '</span>') +
+        '</div>' +
+      '</section>' +
+
+      '<div class="grid3">' +
+        '<div class="tile gold"><div class="k">En tête</div><div class="v">' + esc(leader) + '</div><div class="s">' + leaderSub + '</div></div>' +
+        '<div class="tile"><div class="k">Actions du cycle</div><div class="v">' + acts.length + '</div><div class="s"><a href="actions.html" class="more">Ajouter une action</a></div></div>' +
+        '<div class="tile"><div class="k">Photos du cycle</div><div class="v">' + photos.length + '</div><div class="s"><a href="photos.html" class="more">Ajouter une photo</a></div></div>' +
+      '</div>' +
+
+      '<section class="glass">' +
+        '<div class="head-row"><h2>Classement du cycle</h2><a class="more" href="classement.html">Voir le détail</a></div>' +
+        (hasAny ? App.podiumHTML(s, w.names) : '') +
+        App.rankRows(s, hasAny ? { list: App.PEOPLE.slice().sort(function (a, b) { return s[b.n] - s[a.n]; }).slice(3), offset: 3 } : {}) +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<div class="head-row"><h2>Dernières actions</h2><a class="more" href="actions.html">Tout voir</a></div>' +
+        '<div class="feed">' + (acts.length
+          ? acts.slice(0, 4).map(function (a) { return App.actionItemHTML(a, false); }).join("")
+          : '<div class="empty">Rien pour l\'instant. Ça ne va pas durer.</div>') + '</div>' +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<div class="head-row"><h2>Photos du cycle</h2><a class="more" href="photos.html">Galerie</a></div>' +
+        (photos.length
+          ? '<div class="gallery">' + photos.slice(0, 4).map(function (p) {
+              var pp = App.person(p.who);
+              return '<div class="ph"><div class="img" data-src="' + p.id + '"><img src="' + p.data + '" alt=""></div>' +
+                '<div class="meta"><div class="by">' + App.av(pp) + p.who + '</div></div></div>';
+            }).join("") + '</div>'
+          : '<div class="empty">Aucune photo pour l\'instant.</div>') +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<div class="head-row"><h2>Titres de l\'année ' + year + '</h2><a class="more" href="palmares.html">Palmarès</a></div>' +
+        (anyTitle ? App.rankRows(titles, { pos: true, unit: "titre" }) : '<div class="empty">Aucun titre décerné pour le moment.</div>') +
+      '</section>';
+
+    document.querySelectorAll(".ph .img").forEach(function (el) {
+      el.onclick = function () {
+        var p = App.photos.find(function (x) { return x.id === el.dataset.src; });
+        if (p) App.lightbox(p.data, p.who + (p.caption ? " : " + p.caption : ""));
+      };
+    });
+    tick();
+  }
+
+  function tick() {
+    var d = $("digits"); if (!d) return;
+    var now = new Date(), b = App.cycleBounds(now);
+    var ms = Math.max(0, b.end - now);
+    var days = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4), sec = Math.floor(ms % 6e4 / 1e3);
+    d.innerHTML = [[days, "jours"], [h, "heures"], [m, "minutes"], [sec, "secondes"]].map(function (x) {
+      return '<div class="digit"><b>' + String(x[0]).padStart(2, "0") + '</b><span>' + x[1] + '</span></div>';
+    }).join("");
+    $("prog").style.width = (100 * (now - b.start) / (b.end - b.start)).toFixed(2) + "%";
+  }
+
+  render();
+  setInterval(tick, 1000);
+  App.checkReveals();
+});
+</script>
+</body>
+</html>

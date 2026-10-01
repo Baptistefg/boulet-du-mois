@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classement - Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="rank">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$;
+  var viewKey = App.currentKey();
+  var year = null;
+
+  function render() {
+    var cur = App.currentKey();
+    var s = App.scoresFor(viewKey);
+    var w = App.winnersOf(viewKey);
+    var hasAny = Object.values(s).some(function (v) { return v > 0; });
+    var years = App.years();
+    if (!year || years.indexOf(year) < 0) year = String(new Date().getFullYear());
+
+    var titles = App.yearTitles(year);
+    var ptitles = App.yearPhotoTitles(year);
+    var anyT = Object.values(titles).some(function (v) { return v > 0; });
+    var anyP = Object.values(ptitles).some(function (v) { return v > 0; });
+
+    // Total toutes périodes confondues
+    var total = Object.fromEntries(App.PEOPLE.map(function (p) { return [p.n, 0]; }));
+    App.actions.forEach(function (a) { if (a.who in total) total[a.who]++; });
+    var anyTotal = Object.values(total).some(function (v) { return v > 0; });
+
+    $("app").innerHTML =
+      '<section class="hero">' +
+        '<span class="eyebrow">Qui est en tête</span>' +
+        '<h1>Classement</h1>' +
+        '<p>Le cycle, l\'année et le total de tous les temps.</p>' +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<div class="head-row"><h2>Classement du cycle</h2>' + App.cycleOptions(viewKey) + '</div>' +
+        '<p class="muted" style="margin:-8px 0 14px;font-size:.9rem">Cycle ' + App.cycleRange(viewKey) + (viewKey === cur ? ' (en cours)' : '') + '</p>' +
+        (hasAny
+          ? App.podiumHTML(s, w.names) + App.rankRows(s, { list: App.PEOPLE.slice().sort(function (a, b) { return s[b.n] - s[a.n]; }).slice(3), offset: 3 })
+          : '<div class="empty">Aucune action sur ce cycle.</div>') +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<h2>Classement de l\'année : titres de Boulet du mois</h2>' +
+        '<div class="tabs">' + years.map(function (y) { return '<button class="tab ' + (y === year ? 'on' : '') + '" data-y="' + y + '">' + y + '</button>'; }).join("") + '</div>' +
+        (anyT ? App.rankRows(titles, { pos: true, unit: "titre" }) : '<div class="empty">Aucun titre décerné en ' + year + ' pour le moment.</div>') +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<h2>Classement de l\'année : photos du mois gagnées</h2>' +
+        (anyP ? App.rankRows(ptitles, { pos: true, unit: "victoire", alt: true }) : '<div class="empty">Aucune photo élue en ' + year + ' pour le moment.</div>') +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<h2>Total des mauvaises actions (tous les cycles)</h2>' +
+        (anyTotal ? App.rankRows(total, { pos: true, unit: "action" }) : '<div class="empty">Aucune action enregistrée.</div>') +
+      '</section>';
+
+    $("cycleSel").onchange = function () { viewKey = this.value; render(); };
+    document.querySelectorAll(".tab").forEach(function (t) { t.onclick = function () { year = t.dataset.y; render(); }; });
+  }
+  render();
+});
+</script>
+</body>
+</html>
