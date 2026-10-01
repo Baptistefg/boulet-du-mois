@@ -1,4 +1,4 @@
-/* Boulet du mois - code partagé par toutes les pages */
+/* Juif du mois - code partagé par toutes les pages */
 (function () {
   "use strict";
   const App = (window.App = {});
@@ -190,7 +190,7 @@
     return s;
   };
   App.totalPoints = (key) => Object.values(App.scoresFor(key)).reduce((a, b) => a + b, 0);
-  /* Le Boulet du mois est celui qui a le plus de points de gravité sur le cycle, sans aucun vote.
+  /* Le Juif du mois est celui qui a le plus de points de gravité sur le cycle, sans aucun vote.
      Seule exception : septembre 2026, élu avant la création du site, inscrit ici pour l'historique. */
   const FIXED = { "2026-09": { names: ["Titouan"], note: "Élu entre nous avant la création du site." } };
   App.FIXED = FIXED;
@@ -437,7 +437,7 @@
       simpleOverlay(`<div class="rm">${monthName(key)}</div><div class="rt">Personne n'a rien fait de mal ce mois-ci. Suspect.</div>`, finish);
       return;
     }
-    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Boulet du mois est…</div>`;
+    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Juif du mois est…</div>`;
     const ps = r.names.map(person).filter(Boolean);
     const mid = `<div class="avs">${ps.map((p) => `<div class="av" style="background:${grad(p)}">${p.n[0]}</div>`).join("")}</div>
       <div class="nm">${crownInline}${r.names.join(" & ")}</div>
@@ -462,14 +462,14 @@
   };
 
   /* Annonces automatiques (une seule fois par navigateur) :
-     - le 25 : le Boulet du cycle qui vient de se terminer ;
+     - le 25 : le Juif du cycle qui vient de se terminer ;
      - à partir du 26 : la photo gagnante, une fois le vote du 25 terminé. */
   App.checkReveals = () => {
     const ended = prevKey(App.currentKey());
     const photoKeys = [prevKey(ended), ended].filter((k) => App.resultsVisible(k) && App.photoResults(k).winners.length > 0 && !wasSeen("p-" + k));
     const stepPhoto = (i) => { if (i < photoKeys.length) App.showPhotoReveal(photoKeys[i], true, () => stepPhoto(i + 1)); };
-    const hasBoulet = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
-    if (hasBoulet) App.showReveal(ended, true, () => stepPhoto(0)); else stepPhoto(0);
+    const hasJuif = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
+    if (hasJuif) App.showReveal(ended, true, () => stepPhoto(0)); else stepPhoto(0);
   };
 
   /* ---------- Export / import ---------- */
@@ -477,7 +477,7 @@
     const payload = { version: 6, actions: App.actions, votes: App.votes, photos: App.photos, cup: App.cup };
     const blob = new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "boulet-du-mois.json"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = "Juif-du-mois.json"; a.click();
   };
   /* Import (admin) : ajoute le contenu d'un fichier d'export dans la base. */
   App.importAll = async (text) => {
