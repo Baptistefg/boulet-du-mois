@@ -1,4 +1,4 @@
-/* Boulet du mois - code partagé par toutes les pages */
+/* Juif du mois - code partagé par toutes les pages */
 (function () {
   "use strict";
   const App = (window.App = {});
@@ -88,7 +88,7 @@
     App.actions.forEach((a) => { if (cycleKey(new Date(a.ts)) === key && a.who in s) s[a.who]++; });
     return s;
   };
-  /* Le Boulet du mois est déterminé par le nombre de mauvaises actions du cycle, sans aucun vote.
+  /* Le Juif du mois est déterminé par le nombre de mauvaises actions du cycle, sans aucun vote.
      Seule exception : septembre 2026, déjà élu entre eux, saisi à la main pour l'historique. */
   App.winnersOf = (key) => {
     const s = App.scoresFor(key);
@@ -313,7 +313,7 @@
       simpleOverlay(`<div class="rm">${monthName(key)}</div><div class="rt">Personne n'a rien fait de mal ce mois-ci. Suspect.</div>`, finish);
       return;
     }
-    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Boulet du mois est…</div>`;
+    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Juif du mois est…</div>`;
     const ps = r.names.map(person).filter(Boolean);
     const mid = `<div class="avs">${ps.map((p) => `<div class="av" style="background:${grad(p)}">${p.n[0]}</div>`).join("")}</div>
       <div class="nm">${crownInline}${r.names.join(" & ")}</div>
@@ -340,17 +340,17 @@
   /* Au premier chargement après le 25, annonce le cycle qui vient de se terminer (une seule fois par navigateur). */
   App.checkReveals = () => {
     const ended = prevKey(App.currentKey());
-    const hasBoulet = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
+    const hasJuif = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
     const hasPhoto = App.photoResults(ended).winners.length > 0 && !wasSeen("p-" + ended);
     const stepPhoto = () => { if (hasPhoto) App.showPhotoReveal(ended, true); };
-    if (hasBoulet) App.showReveal(ended, true, stepPhoto); else stepPhoto();
+    if (hasJuif) App.showReveal(ended, true, stepPhoto); else stepPhoto();
   };
 
   /* ---------- Export / import ---------- */
   App.exportAll = () => {
     const blob = new Blob([JSON.stringify({ version: 4, actions: App.actions, overrides: App.overrides, votes: App.votes, photos: App.photos }, null, 1)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "boulet-du-mois.json"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = "Juif-du-mois.json"; a.click();
   };
   App.importAll = async (text) => {
     const d = JSON.parse(text);
