@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photothèque - Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="cup">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$, esc = App.esc;
+
+  // Saison : de septembre 2026 à juin 2027
+  var SEASON = [];
+  (function () { var y = 2026, m = 9; for (var i = 0; i < 10; i++) { SEASON.push(App.keyOf(y, m + i)); } })();
+  var ABBR = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+  var FRAMES = ["f-gold", "f-silver", "f-wood", "f-bronze", "f-neon"];
+  var FRAME_NAMES = { "f-gold": "Cadre or", "f-silver": "Cadre argent", "f-wood": "Cadre bois", "f-bronze": "Cadre bronze", "f-neon": "Cadre néon" };
+  var TROPHY = '<svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><path d="M18 6h28v6h10v6c0 8.3-5.9 15.2-13.7 16.7A14 14 0 0 1 35 42.4V50h9v8H20v-8h9v-7.6a14 14 0 0 1-7.3-7.7C13.9 33.2 8 26.3 8 18v-6h10V6zm-4 12c0 4.6 2.9 8.5 7 9.9V18h-7zm36 0h-7v9.9c4.1-1.4 7-5.3 7-9.9z"/></svg>';
+  var pending = {};   // fichiers choisis par mois (admin)
+
+  function status(k) {
+    var cur = App.currentKey();
+    if (k > cur) return "future";
+    if (k === cur) return "current";
+    return "done";
+  }
+
+  function frameHTML(c, frame, k, big) {
+    return '<figure class="pframe ' + frame + (big ? ' big' : '') + '">' +
+      (App.isAdmin() ? '<button class="x del" data-delcup="' + c.id + '" title="Supprimer (admin)">×</button>' : '') +
+      '<div class="mat"><img src="' + c.data + '" alt="" loading="lazy" data-open="' + c.id + '"></div>' +
+      (c.caption ? '<figcaption>' + esc(c.caption) + '</figcaption>' : '') +
+    '</figure>';
+  }
+
+  function emptyFrame(frame, st) {
+    var txt = st === "future" ? "À venir" : st === "current" ? "En jeu en ce moment" : "Photo avec la coupe à ajouter";
+    return '<figure class="pframe ' + frame + ' big"><div class="mat empty"><div class="trophy">' + TROPHY + '</div><span>' + txt + '</span></div></figure>';
+  }
+
+  function monthHTML(k, i) {
+    var st = status(k), frame = FRAMES[i % FRAMES.length];
+    var w = st === "done" ? App.winnersOf(k) : { names: [] };
+    var shots = App.cupOf(k);
+    var winnerLine = st === "future"
+      ? '<span class="muted">Pas encore joué</span>'
+      : st === "current"
+        ? '<span class="muted">Cycle en cours, élection le ' + App.CYCLE_DAY + '</span>'
+        : (w.names.length ? App.crownInline + '<b>' + esc(w.names.join(" & ")) + '</b>' + (w.max ? ' <span class="muted">· ' + App.plural(w.max, "point") + '</span>' : '') : '<span class="muted">Aucun boulet ce mois-ci</span>');
+
+    var gallery = shots.length
+      ? '<div class="frames ' + (shots.length === 1 ? 'one' : '') + '">' + shots.map(function (c, j) { return frameHTML(c, frame, k, shots.length === 1); }).join("") + '</div>'
+      : '<div class="frames one">' + emptyFrame(frame, st) + '</div>';
+
+    var upload = (App.isAdmin() && st !== "future")
+      ? '<div class="cup-up">' +
+          '<label class="btn ghost small"><input type="file" accept="image/*" multiple hidden data-pick="' + k + '">Choisir des photos</label>' +
+          '<input type="text" placeholder="Légende (optionnel)" maxlength="120" data-cap="' + k + '">' +
+          '<button class="btn small" data-send="' + k + '">Ajouter' + (pending[k] ? ' (' + pending[k].length + ')' : '') + '</button>' +
+        '</div>'
+      : '';
+
+    return '<section class="glass month ' + st + '" id="m-' + k + '">' +
+      '<div class="month-head">' +
+        '<div><div class="eyebrow" style="margin:0">' + FRAME_NAMES[frame] + '</div><h2 class="month-title">' + App.monthName(k) + '</h2></div>' +
+        '<div class="plaque">' + winnerLine + '</div>' +
+      '</div>' +
+      gallery + upload +
+    '</section>';
+  }
+
+  function render() {
+    var cur = App.currentKey();
+    var done = SEASON.filter(function (k) { return status(k) === "done"; });
+    var count = {};
+    done.forEach(function (k) { App.winnersOf(k).names.forEach(function (n) { count[n] = (count[n] || 0) + 1; }); });
+    var leaderMax = Math.max.apply(null, [0].concat(Object.values(count)));
+    var leaders = Object.keys(count).filter(function (n) { return count[n] === leaderMax; });
+
+    var html =
+      '<section class="hero">' +
+        '<div class="hero-trophy">' + TROPHY + '</div>' +
+        '<span class="eyebrow">Saison 2026 - 2027</span>' +
+        '<h1>Photothèque</h1>' +
+        '<p>Chaque mois, le Boulet pose avec la coupe. De septembre à juin.</p>' +
+      '</section>' +
+
+      '<section class="glass">' +
+        '<h2>La saison en un coup d\'œil</h2>' +
+        '<div class="season">' + SEASON.map(function (k) {
+          var st = status(k), w = st === "done" ? App.winnersOf(k).names : [];
+          var p = w.length ? App.person(w[0]) : null;
+          return '<a class="medal ' + st + '" href="#m-' + k + '">' +
+            '<span class="disc" style="' + (p ? 'background:' + App.grad(p) : '') + '">' + (p ? p.n[0] : st === "current" ? '…' : '') + '</span>' +
+            '<span class="mlabel">' + ABBR[+k.split("-")[1] - 1] + '</span>' +
+            '<span class="mname">' + (w.length ? esc(w.join(" & ")) : st === "current" ? 'En cours' : '') + '</span>' +
+          '</a>';
+        }).join("") + '</div>' +
+        (leaders.length && leaderMax > 0
+          ? '<p class="muted" style="margin:16px 0 0;text-align:center">Le plus titré de la saison : <b style="color:var(--gold)">' + esc(leaders.join(" & ")) + '</b> (' + App.plural(leaderMax, "titre") + ')</p>'
+          : '') +
+        (!App.isAdmin() ? '<p class="muted" style="margin:10px 0 0;text-align:center;font-size:.85rem">Les photos avec la coupe sont ajoutées par l\'admin.</p>' : '') +
+      '</section>' +
+
+      SEASON.map(monthHTML).join("");
+
+    $("app").innerHTML = html;
+
+    document.querySelectorAll("[data-open]").forEach(function (im) {
+      im.onclick = function () {
+        var c = App.cup.find(function (x) { return x.id === im.dataset.open; });
+        if (c) App.lightbox(c.data, App.monthName(c.cycle) + (c.caption ? " : " + c.caption : ""));
+      };
+    });
+    document.querySelectorAll("[data-pick]").forEach(function (inp) {
+      inp.onchange = function () { pending[inp.dataset.pick] = Array.prototype.slice.call(inp.files); keepCaptions(); render(); };
+    });
+    document.querySelectorAll("[data-send]").forEach(function (b) {
+      b.onclick = async function () {
+        var k = b.dataset.send, list = pending[k] || [];
+        if (!list.length) { App.toast("Choisis d'abord une photo"); return; }
+        var cap = (document.querySelector('[data-cap="' + k + '"]') || {}).value || "";
+        b.disabled = true; b.textContent = "Envoi...";
+        var ok = 0, err = null;
+        for (var i = 0; i < list.length; i++) {
+          try { await App.addCup(k, cap, list[i]); ok++; } catch (e) { err = e.message; break; }
+        }
+        delete pending[k]; delete captions[k];
+        render();
+        App.toast(err ? "Erreur : " + err : App.plural(ok, "photo") + " ajoutée" + (ok > 1 ? "s" : "") + " pour " + App.monthName(k));
+      };
+    });
+    document.querySelectorAll("[data-delcup]").forEach(function (b) {
+      b.onclick = async function () {
+        if (!confirm("Supprimer cette photo ?")) return;
+        try { await App.delCup(b.dataset.delcup); render(); } catch (e) { App.toast("Erreur : " + e.message); }
+      };
+    });
+  }
+  var captions = {};
+  function keepCaptions() { document.querySelectorAll("[data-cap]").forEach(function (i) { captions[i.dataset.cap] = i.value; }); }
+  var baseRender = render;
+  render = function () {
+    baseRender();
+    document.querySelectorAll("[data-cap]").forEach(function (i) { if (captions[i.dataset.cap]) i.value = captions[i.dataset.cap]; });
+  };
+  render();
+  if (location.hash) { var el = document.querySelector(location.hash); if (el) el.scrollIntoView(); }
+});
+</script>
+</body>
+</html>

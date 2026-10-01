@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin - Boulet du mois</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="admin">
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="app"></main>
+  <footer>Boulet du mois</footer>
+</div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+App.ready.then(function () {
+  var $ = App.$, esc = App.esc;
+
+  function render() {
+    var mode = !App.configured
+      ? '<span class="pill">Base de données non configurée</span>'
+      : App.loadError ? '<span class="pill">Base de données injoignable</span>'
+      : '<span class="pill live">Base de données en ligne</span>';
+    var html =
+      '<section class="hero">' +
+        '<span class="eyebrow">Accès restreint</span>' +
+        '<h1>Admin</h1>' +
+        '<p>Seul l\'admin peut supprimer des actions ou des photos, importer des données et ajouter les photos avec la coupe.</p>' +
+        '<div style="margin-top:14px">' + mode + '</div>' +
+      '</section>';
+
+    if (!App.configured) {
+      html +=
+        '<section class="glass">' +
+          '<h2>Configuration requise</h2>' +
+          '<p class="muted" style="margin:0">Le site enregistre tout dans une base Supabase pour que tout le monde voie les mêmes données. Crée le projet, lance <b>setup.sql</b>, crée ton compte admin, puis colle l\'URL et la clé publique dans <b>config.js</b>. Les étapes détaillées sont dans <b>README.md</b>.</p>' +
+        '</section>';
+    } else if (App.isAdmin()) {
+      html +=
+        '<section class="glass" style="text-align:center">' +
+          '<h2>Tu es connecté en admin' + (App.adminEmail() ? ' (' + esc(App.adminEmail()) + ')' : '') + '</h2>' +
+          '<p class="muted" style="margin:0 0 18px">Les boutons de suppression apparaissent sur les pages Actions et Photos, l\'ajout de photos dans la Photothèque, et l\'import dans Palmarès.</p>' +
+          '<div class="toolbar" style="justify-content:center">' +
+            '<a class="btn" href="phototheque.html">Photothèque</a>' +
+            '<a class="btn ghost" href="actions.html">Gérer les actions</a>' +
+            '<a class="btn ghost" href="photos.html">Gérer les photos</a>' +
+            '<button class="btn ghost" id="logout">Se déconnecter</button>' +
+          '</div>' +
+        '</section>';
+    } else {
+      html +=
+        '<section class="glass">' +
+          '<h2>Connexion</h2>' +
+          '<form id="login" style="display:grid;gap:10px">' +
+            '<input type="text" id="email" placeholder="E-mail admin" autocomplete="username" inputmode="email" required>' +
+            '<div class="row-input">' +
+              '<input type="password" id="pw" placeholder="Mot de passe admin" autocomplete="current-password" required>' +
+              '<button class="btn" type="submit">Se connecter</button>' +
+            '</div>' +
+          '</form>' +
+        '</section>';
+    }
+    $("app").innerHTML = html;
+
+    if ($("login")) $("login").onsubmit = async function (e) {
+      e.preventDefault();
+      var btn = e.target.querySelector("button"); btn.disabled = true;
+      var ok = false;
+      try { ok = await App.adminLogin($("pw").value, $("email").value); } catch (err) { App.toast(err.message); }
+      btn.disabled = false;
+      if (ok) { App.toast("Connecté en admin"); render(); }
+      else { App.toast("E-mail ou mot de passe incorrect"); $("pw").value = ""; }
+    };
+    if ($("logout")) $("logout").onclick = function () { App.adminLogout(); App.toast("Déconnecté"); render(); };
+  }
+  render();
+});
+</script>
+</body>
+</html>

@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Juif du mois</title>
+<title>Boulet du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="home">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Juif du mois</footer>
+  <footer>Boulet du mois</footer>
 </div>
+<script src="config.js"></script>
 <script src="app.js"></script>
 <script>
 App.ready.then(function () {
@@ -24,18 +25,18 @@ App.ready.then(function () {
     var hasAny = Object.values(s).some(function (v) { return v > 0; });
     var acts = App.actionsOf(cur);
     var photos = App.photosOf(cur);
-    var voteOpen = App.isVoteOpen();
+    var voteOpen = !!App.voteKey();
     var year = String(new Date().getFullYear());
     var titles = App.yearTitles(year);
     var anyTitle = Object.values(titles).some(function (v) { return v > 0; });
 
     var leader = hasAny ? w.names.join(" & ") : "Personne";
-    var leaderSub = hasAny ? App.plural(w.max, "action") : "Pas encore d'action ce cycle";
+    var leaderSub = hasAny ? App.plural(w.max, "point") : "Pas encore d'action ce cycle";
 
     $("app").innerHTML =
       '<section class="hero">' +
         '<span class="eyebrow">Édition ' + App.monthName(cur) + '</span>' +
-        '<h1>Juif du mois</h1>' +
+        '<h1>Boulet du mois</h1>' +
         '<p>Cycle en cours : ' + App.cycleRange(cur) + '.</p>' +
       '</section>' +
 
@@ -45,14 +46,14 @@ App.ready.then(function () {
         '<div class="progress"><div id="prog" style="width:0"></div></div>' +
         '<div style="margin-top:14px">' +
           (voteOpen
-            ? '<span class="pill live">Vote photo ouvert</span> <a class="more" href="photos.html">Voter maintenant</a>'
+            ? '<span class="pill live">Vote photo ouvert aujourd\'hui</span> <a class="more" href="photos.html">Voter maintenant</a>'
             : '<span class="pill">Vote photo ' + App.voteWindow() + '</span>') +
         '</div>' +
       '</section>' +
 
       '<div class="grid3">' +
         '<div class="tile gold"><div class="k">En tête</div><div class="v">' + esc(leader) + '</div><div class="s">' + leaderSub + '</div></div>' +
-        '<div class="tile"><div class="k">Actions du cycle</div><div class="v">' + acts.length + '</div><div class="s"><a href="actions.html" class="more">Ajouter une action</a></div></div>' +
+        '<div class="tile"><div class="k">Actions du cycle</div><div class="v">' + acts.length + '</div><div class="s">' + App.plural(App.totalPoints(cur), "point") + ' au total · <a href="actions.html" class="more">Ajouter</a></div></div>' +
         '<div class="tile"><div class="k">Photos du cycle</div><div class="v">' + photos.length + '</div><div class="s"><a href="photos.html" class="more">Ajouter une photo</a></div></div>' +
       '</div>' +
 
@@ -71,13 +72,11 @@ App.ready.then(function () {
 
       '<section class="glass">' +
         '<div class="head-row"><h2>Photos du cycle</h2><a class="more" href="photos.html">Galerie</a></div>' +
-        (photos.length
-          ? '<div class="gallery">' + photos.slice(0, 4).map(function (p) {
-              var pp = App.person(p.who);
-              return '<div class="ph"><div class="img" data-src="' + p.id + '"><img src="' + p.data + '" alt=""></div>' +
-                '<div class="meta"><div class="by">' + App.av(pp) + p.who + '</div></div></div>';
-            }).join("") + '</div>'
-          : '<div class="empty">Aucune photo pour l\'instant.</div>') +
+        (voteOpen
+          ? '<div class="empty">Les photos du cycle précédent sont dévoilées aujourd\'hui. <a class="more" href="photos.html">Aller voter</a></div>'
+          : photos.length
+            ? '<div class="empty">' + App.plural(photos.length, "photo") + ' déposée' + (photos.length > 1 ? 's' : '') + ', cachée' + (photos.length > 1 ? 's' : '') + ' jusqu\'au ' + App.CYCLE_DAY + ' ' + App.monthLower(cur) + '. Surprise.</div>'
+            : '<div class="empty">Aucune photo pour l\'instant.</div>') +
       '</section>' +
 
       '<section class="glass">' +
@@ -85,12 +84,6 @@ App.ready.then(function () {
         (anyTitle ? App.rankRows(titles, { pos: true, unit: "titre" }) : '<div class="empty">Aucun titre décerné pour le moment.</div>') +
       '</section>';
 
-    document.querySelectorAll(".ph .img").forEach(function (el) {
-      el.onclick = function () {
-        var p = App.photos.find(function (x) { return x.id === el.dataset.src; });
-        if (p) App.lightbox(p.data, p.who + (p.caption ? " : " + p.caption : ""));
-      };
-    });
     tick();
   }
 

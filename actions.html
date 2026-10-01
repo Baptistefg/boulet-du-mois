@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Actions - Juif du mois</title>
+<title>Actions - Boulet du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="actions">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Juif du mois</footer>
+  <footer>Boulet du mois</footer>
 </div>
+<script src="config.js"></script>
 <script src="app.js"></script>
 <script>
 App.ready.then(function () {
@@ -19,6 +20,8 @@ App.ready.then(function () {
   var viewKey = App.currentKey();
   var formWho = App.PEOPLE[0].n;
   var filter = "all";
+  var formPts = 1;
+  var SEV = { 1: "Léger", 2: "Moyen", 3: "Grave" };
 
   function render() {
     var cur = App.currentKey();
@@ -31,7 +34,7 @@ App.ready.then(function () {
       '<section class="hero">' +
         '<span class="eyebrow">Mauvaises actions</span>' +
         '<h1>Actions</h1>' +
-        '<p>Chaque action doit avoir une justification.</p>' +
+        '<p>Chaque action a une justification et une gravité de 1 à 3 points. Le Boulet du mois est celui qui a le plus de points.</p>' +
       '</section>' +
 
       (isCur
@@ -39,6 +42,9 @@ App.ready.then(function () {
             '<h2>Nouvelle mauvaise action</h2>' +
             '<div class="pick">' + App.PEOPLE.map(function (p) {
               return '<button type="button" class="chip ' + (formWho === p.n ? 'on' : '') + '" data-who="' + p.n + '">' + App.av(p) + p.n + '</button>';
+            }).join("") + '</div>' +
+            '<div class="sev"><span class="lbl">Gravité</span>' + [1, 2, 3].map(function (n) {
+              return '<button type="button" class="s' + n + ' ' + (formPts === n ? 'on' : '') + '" data-pts="' + n + '">' + n + ' pt' + (n > 1 ? 's' : '') + ' · ' + SEV[n] + '</button>';
             }).join("") + '</div>' +
             '<form id="form" class="row-input">' +
               '<input type="text" id="why" placeholder="Qu\'est-ce qu\'il a fait ? (justification obligatoire)" maxlength="200" required autocomplete="off">' +
@@ -49,11 +55,11 @@ App.ready.then(function () {
 
       '<section class="glass">' +
         '<div class="head-row"><h2>Historique</h2>' + App.cycleOptions(viewKey) + '</div>' +
-        '<p class="muted" style="margin:-8px 0 14px;font-size:.9rem">Cycle ' + App.cycleRange(viewKey) + '. ' + App.plural(all.length, "action") + '.</p>' +
+        '<p class="muted" style="margin:-8px 0 14px;font-size:.9rem">Cycle ' + App.cycleRange(viewKey) + '. ' + App.plural(all.length, "action") + ', ' + App.plural(App.totalPoints(viewKey), "point") + '.' + (App.isAdmin() ? '' : ' Seul l\'admin peut supprimer une action.') + '</p>' +
         '<div class="tabs">' +
           '<button class="tab ' + (filter === "all" ? "on" : "") + '" data-f="all">Tous</button>' +
           App.PEOPLE.map(function (p) {
-            return '<button class="tab ' + (filter === p.n ? "on" : "") + '" data-f="' + p.n + '">' + p.n + ' (' + s[p.n] + ')</button>';
+            return '<button class="tab ' + (filter === p.n ? "on" : "") + '" data-f="' + p.n + '">' + p.n + ' (' + s[p.n] + ' pt' + (s[p.n] > 1 ? 's' : '') + ')</button>';
           }).join("") +
         '</div>' +
         '<div class="feed">' + (list.length
@@ -67,19 +73,32 @@ App.ready.then(function () {
         document.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x.dataset.who === formWho); });
       };
     });
-    if ($("form")) $("form").onsubmit = function (e) {
+    document.querySelectorAll("[data-pts]").forEach(function (b) {
+      b.onclick = function () {
+        formPts = Number(b.dataset.pts);
+        document.querySelectorAll("[data-pts]").forEach(function (x) { x.classList.toggle("on", Number(x.dataset.pts) === formPts); });
+      };
+    });
+    if ($("form")) $("form").onsubmit = async function (e) {
       e.preventDefault();
       var why = $("why").value.trim();
       if (!why) return;
-      App.addAction(formWho, why);
-      App.toast("Action ajoutée pour " + formWho);
-      render();
+      var btn = $("form").querySelector("button"); btn.disabled = true;
+      try {
+        await App.addAction(formWho, why, formPts);
+        App.toast("+" + formPts + " pt" + (formPts > 1 ? "s" : "") + " pour " + formWho);
+        formPts = 1;
+        render();
+      } catch (err) { btn.disabled = false; App.toast("Erreur : " + err.message); }
     };
     document.querySelectorAll(".tab").forEach(function (t) { t.onclick = function () { filter = t.dataset.f; render(); }; });
     $("cycleSel").onchange = function () { viewKey = this.value; filter = "all"; render(); };
     document.querySelectorAll("[data-del]").forEach(function (b) {
       b.onclick = function () {
-        if (confirm("Supprimer cette action ?")) { App.delAction(b.dataset.del); render(); }
+        if (!App.isAdmin()) { App.toast("Réservé à l'admin"); render(); return; }
+        if (confirm("Supprimer cette action ?")) {
+          App.delAction(b.dataset.del).then(render, function (err) { App.toast("Erreur : " + err.message); });
+        }
       };
     });
   }
