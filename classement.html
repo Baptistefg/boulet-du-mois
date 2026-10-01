@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Classement - Boulet du mois</title>
+<title>Classement - Juif du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="rank">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Boulet du mois</footer>
+  <footer>Juif du mois</footer>
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
@@ -54,7 +54,7 @@ App.ready.then(function () {
       '</section>' +
 
       '<section class="glass">' +
-        '<h2>Classement de l\'année : titres de Boulet du mois</h2>' +
+        '<h2>Classement de l\'année : titres de Juif du mois</h2>' +
         '<div class="tabs">' + years.map(function (y) { return '<button class="tab ' + (y === year ? 'on' : '') + '" data-y="' + y + '">' + y + '</button>'; }).join("") + '</div>' +
         (anyT ? App.rankRows(titles, { pos: true, unit: "titre" }) : '<div class="empty">Aucun titre décerné en ' + year + ' pour le moment.</div>') +
       '</section>' +
