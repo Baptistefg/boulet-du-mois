@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Septembre 2026 - Boulet du mois</title>
+<title>Septembre 2026 - Juif du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="sept">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Boulet du mois</footer>
+  <footer>Juif du mois</footer>
 </div>
 <script src="app.js"></script>
 <script>
@@ -39,13 +39,13 @@ App.ready.then(function () {
       '<section class="hero">' +
         '<span class="eyebrow">Édition spéciale</span>' +
         '<h1>Septembre 2026</h1>' +
-        '<p>Cycle ' + App.cycleRange(App.SEP) + '. Le Boulet de septembre a déjà été élu entre nous : on le saisit ici pour garder la trace dans l\'historique.</p>' +
+        '<p>Cycle ' + App.cycleRange(App.SEP) + '. Le Juif de septembre a déjà été élu entre nous : on le saisit ici pour garder la trace dans l\'historique.</p>' +
       '</section>' +
 
       (saved
         ? '<section class="glass">' + result + '</section>'
         : '<section class="glass">' +
-            '<h2>Qui est le Boulet de septembre ?</h2>' +
+            '<h2>Qui est le Juif de septembre ?</h2>' +
             '<div class="cards">' + App.PEOPLE.map(function (p) {
               return '<button class="pcard ' + (selected.indexOf(p.n) >= 0 ? 'on' : '') + '" data-p="' + p.n + '">' + App.av(p) + '<b>' + p.n + '</b></button>';
             }).join("") + '</div>' +
@@ -56,7 +56,7 @@ App.ready.then(function () {
 
       '<section class="glass">' +
         '<h2>À partir d\'octobre</h2>' +
-        '<p class="muted" style="margin:0">Dès le cycle d\'octobre (du 25 septembre au 24 octobre), le Boulet du mois est calculé uniquement avec les mauvaises actions ajoutées sur le site. Cette page ne sert que pour septembre.</p>' +
+        '<p class="muted" style="margin:0">Dès le cycle d\'octobre (du 25 septembre au 24 octobre), le Juif du mois est calculé uniquement avec les mauvaises actions ajoutées sur le site. Cette page ne sert que pour septembre.</p>' +
       '</section>';
 
     if (!saved) {
