@@ -55,10 +55,10 @@ h2 { margin: 0 0 16px; font-size: 1.05rem; letter-spacing: .02em; }
 .chip small { color: inherit; opacity: .7; font-weight: 500; }
 .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: .9rem; font-weight: 800; color: #fff; flex: none; text-shadow: 0 1px 4px rgba(0,0,0,.3); }
 .row-input { display: flex; gap: 10px; }
-input[type=text], textarea, select { flex: 1; width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(0,0,0,.28); color: var(--text); font: inherit; outline: none; transition: .2s; }
+input[type=text], input[type=password], input[type=email], textarea, select { flex: 1; width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(0,0,0,.28); color: var(--text); font: inherit; outline: none; transition: .2s; }
 select { width: auto; flex: none; cursor: pointer; padding: 10px 14px; }
 select option { background: #1c1a2b; color: var(--text); }
-input[type=text]:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,77,109,.18); }
+input[type=text]:focus, input[type=password]:focus, input[type=email]:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,77,109,.18); }
 textarea { resize: vertical; min-height: 90px; }
 .btn { border: none; cursor: pointer; font: inherit; font-weight: 700; padding: 14px 24px; border-radius: 14px; color: #fff;
   background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 10px 30px rgba(255,77,109,.35); transition: .2s; white-space: nowrap; text-decoration: none; display: inline-block; }
