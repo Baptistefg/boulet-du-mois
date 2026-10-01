@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Palmarès - Boulet du mois</title>
+<title>Palmarès - Juif du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="hof">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Boulet du mois</footer>
+  <footer>Juif du mois</footer>
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
@@ -30,12 +30,12 @@ App.ready.then(function () {
     var lastPhotoKey = keys.filter(function (k) { return App.resultsVisible(k) && App.photoResults(k).winners.length > 0; })[0];
 
     $("app").innerHTML =
-      '<section class="hero"><span class="eyebrow">Hall of shame</span><h1>Palmarès</h1><p>Tous les boulets et toutes les photos qui ont marqué l\'histoire.</p></section>' +
+      '<section class="hero"><span class="eyebrow">Hall of shame</span><h1>Palmarès</h1><p>Tous les Juifs et toutes les photos qui ont marqué l\'histoire.</p></section>' +
 
       '<section class="glass">' +
         '<h2>Classement de l\'année</h2>' +
         '<div class="tabs">' + years.map(function (y) { return '<button class="tab ' + (y === year ? 'on' : '') + '" data-y="' + y + '">' + y + '</button>'; }).join("") + '</div>' +
-        '<p class="muted" style="margin:0 0 8px;font-size:.9rem">Titres de Boulet du mois</p>' +
+        '<p class="muted" style="margin:0 0 8px;font-size:.9rem">Titres de Juif du mois</p>' +
         (anyT ? App.rankRows(titles, { pos: true, unit: "titre" }) : '<div class="empty">Aucun titre décerné en ' + year + ' pour le moment.</div>') +
         '<p class="muted" style="margin:18px 0 8px;font-size:.9rem">Photos du mois gagnées</p>' +
         (anyP ? App.rankRows(ptitles, { pos: true, unit: "victoire", alt: true }) : '<div class="empty">Aucune photo élue en ' + year + ' pour le moment.</div>') +
@@ -60,7 +60,7 @@ App.ready.then(function () {
       '<section class="glass">' +
         '<h2>Outils</h2>' +
         '<div class="toolbar">' +
-          '<button class="btn ghost" id="pb">Tester l\'animation Boulet (cycle en cours)</button>' +
+          '<button class="btn ghost" id="pb">Tester l\'animation Juif (cycle en cours)</button>' +
           (lastPhotoKey ? '<button class="btn ghost" id="pp">Revoir l\'annonce de la dernière photo du mois</button>' : '') +
           '<button class="btn ghost" id="exp">Exporter les données</button>' +
           (App.isAdmin() ? '<button class="btn ghost" id="imp">Importer des données</button>' : '') +
