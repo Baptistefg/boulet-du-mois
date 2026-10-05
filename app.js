@@ -1,4 +1,4 @@
-/* Boulet du mois - code partagé par toutes les pages */
+/* Juif du mois - code partagé par toutes les pages */
 (function () {
   "use strict";
   const App = (window.App = {});
@@ -171,7 +171,6 @@
   App.votes = {};
   App.photos = [];
   App.cup = [];
-  App.contests = [];   // { action_id, who, ts }
   App.profiles = {};   // { prénom: version de la photo }
   App.force = {};   // plus de mode test : les photos ne sont jamais dévoilées avant le 25
   App.loadError = "";
@@ -208,35 +207,14 @@
   };
   App.actionsOf = (key) => App.actions.filter((a) => cycleKey(new Date(a.ts)) === key).sort((a, b) => b.ts - a.ts);
 
-  /* ---------- Contestations ----------
-     Chacun peut contester une action du cycle en cours (sauf la personne visée).
-     À partir de CONTEST_LIMIT contestations, l'action est annulée et ne rapporte plus de points. */
-  const CONTEST_LIMIT = 3;
-  App.CONTEST_LIMIT = CONTEST_LIMIT;
-  App.contestsOf = (a) => App.contests.filter((c) => c.action_id === a.id && c.who !== a.who).map((c) => c.who);
-  App.isVoided = (a) => App.contestsOf(a).length >= CONTEST_LIMIT;
-  App.canContest = (a, who) => !!who && who !== a.who && cycleKey(new Date(a.ts)) === App.currentKey() && App.contestsOf(a).indexOf(who) < 0;
-  App.contest = async (actionId, who) => {
-    requireDb();
-    const a = App.actions.find((x) => x.id === actionId);
-    if (!a || !person(who)) return false;
-    if (who === a.who) throw new Error("Tu ne peux pas contester ta propre action");
-    if (cycleKey(new Date(a.ts)) !== App.currentKey()) throw new Error("On ne peut contester que les actions du cycle en cours");
-    if (App.contestsOf(a).indexOf(who) >= 0) return false;
-    const c = { action_id: actionId, who, ts: Date.now() };
-    await db.insert("contests", c);
-    App.contests.push(c);
-    return true;
-  };
-
   /* Le score d'un cycle = somme des points de gravité (1 à 3) des mauvaises actions. */
   App.scoresFor = (key) => {
     const s = Object.fromEntries(PEOPLE.map((p) => [p.n, 0]));
-    App.actions.forEach((a) => { if (cycleKey(new Date(a.ts)) === key && a.who in s && !App.isVoided(a)) s[a.who] += ptsOf(a); });
+    App.actions.forEach((a) => { if (cycleKey(new Date(a.ts)) === key && a.who in s) s[a.who] += ptsOf(a); });
     return s;
   };
   App.totalPoints = (key) => Object.values(App.scoresFor(key)).reduce((a, b) => a + b, 0);
-  /* Le Boulet du mois est celui qui a le plus de points de gravité sur le cycle, sans aucun vote.
+  /* Le Juif du mois est celui qui a le plus de points de gravité sur le cycle, sans aucun vote.
      Seule exception : septembre 2026, élu avant la création du site, inscrit ici pour l'historique. */
   const FIXED = { "2026-09": { names: ["Titouan"], note: "Élu entre nous avant la création du site." } };
   App.FIXED = FIXED;
@@ -435,13 +413,11 @@
         <div class="ct">${s[p.n]}${opts.unit ? ` <small>${opts.unit}${s[p.n] > 1 ? "s" : ""}</small>` : ""}</div></div>`;
     }).join("");
   };
-  /* Une action dans une liste. interactive = boutons contester / modifier / supprimer (page Actions). */
-  App.editing = null;   // id de l'action en cours de modification (admin)
+  /* Une action dans une liste. interactive = boutons modifier / supprimer pour l'admin (page Actions). */
+  App.editing = null;       // id de l'action en cours de modification (admin)
   App.actionItemHTML = (a, interactive) => {
     const p = person(a.who) || PEOPLE[0];
     const pts = ptsOf(a);
-    const voided = App.isVoided(a);
-    const contesters = App.contestsOf(a);
     const date = new Date(a.ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
     if (interactive && App.editing === a.id && App.isAdmin()) {
@@ -458,48 +434,20 @@
       </div>`;
     }
 
-    const voter = App.getVoter();
-    let contestUI = "";
-    if (contesters.length || (interactive && cycleKey(new Date(a.ts)) === App.currentKey())) {
-      const count = `<span class="contest-count${voided ? " voided" : ""}" title="${esc(contesters.join(", "))}">${voided ? "Annulée" : contesters.length + "/" + CONTEST_LIMIT + " contestation" + (contesters.length > 1 ? "s" : "")}</span>`;
-      let btn = "";
-      if (interactive && !voided) {
-        if (!voter) btn = "";
-        else if (voter === a.who) btn = "";
-        else if (contesters.indexOf(voter) >= 0) btn = `<span class="contest-done">Tu as contesté</span>`;
-        else if (App.canContest(a, voter)) btn = `<button class="contest-btn" data-contest="${a.id}">Je conteste</button>`;
-      }
-      contestUI = `<div class="contest">${contesters.length || voided ? count : ""}${btn}</div>`;
-    }
-
     const admin = interactive && App.isAdmin()
       ? `<div class="admin-act"><button class="mini" data-edit="${a.id}">Modifier</button><button class="x" data-del="${a.id}" title="Supprimer (admin)">×</button></div>`
       : "";
-    return `<div class="item${voided ? " voided" : ""}" data-item="${a.id}">${av(p)}
+    return `<div class="item" data-item="${a.id}">${av(p)}
       <div class="body">
         <div class="who">${esc(a.who)}<span class="pts p${pts}">${pts} pt${pts > 1 ? "s" : ""}</span></div>
         <div class="why">${esc(a.why)}</div>
-        ${contestUI}
       </div>
       <div><div class="dt">${date}</div>${admin}</div>
     </div>`;
   };
 
-  /* Branche les boutons d'une liste d'actions (contester, modifier, supprimer). */
+  /* Branche les boutons d'une liste d'actions (modifier, supprimer). */
   App.bindActionItems = (rerender) => {
-    document.querySelectorAll("[data-contest]").forEach((b) => {
-      b.onclick = async () => {
-        const who = App.getVoter();
-        if (!who) { toast("Choisis d'abord qui tu es"); return; }
-        b.disabled = true;
-        try {
-          await App.contest(b.dataset.contest, who);
-          const a = App.actions.find((x) => x.id === b.dataset.contest);
-          toast(a && App.isVoided(a) ? "Action annulée : " + CONTEST_LIMIT + " contestations" : "Contestation enregistrée");
-          rerender();
-        } catch (e) { b.disabled = false; toast("Erreur : " + e.message); }
-      };
-    });
     document.querySelectorAll("[data-del]").forEach((b) => {
       if (!b.closest("[data-item]")) return;
       b.onclick = async () => {
@@ -599,7 +547,7 @@
       simpleOverlay(`<div class="rm">${monthName(key)}</div><div class="rt">Personne n'a rien fait de mal ce mois-ci. Suspect.</div>`, finish);
       return;
     }
-    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Boulet du mois est…</div>`;
+    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Juif du mois est…</div>`;
     const ps = r.names.map(person).filter(Boolean);
     const mid = `<div class="avs">${ps.map((p) => `<div class="av${App.avatarUrl(p.n) ? " img" : ""}" style="${avStyle(p)}">${p.n[0]}</div>`).join("")}</div>
       <div class="nm">${crownInline}${r.names.join(" & ")}</div>
@@ -624,22 +572,22 @@
   };
 
   /* Annonces automatiques (une seule fois par navigateur) :
-     - le 25 : le Boulet du cycle qui vient de se terminer ;
+     - le 25 : le Juif du cycle qui vient de se terminer ;
      - à partir du 26 : la photo gagnante, une fois le vote du 25 terminé. */
   App.checkReveals = () => {
     const ended = prevKey(App.currentKey());
     const photoKeys = [prevKey(ended), ended].filter((k) => App.resultsVisible(k) && App.photoResults(k).winners.length > 0 && !wasSeen("p-" + k));
     const stepPhoto = (i) => { if (i < photoKeys.length) App.showPhotoReveal(photoKeys[i], true, () => stepPhoto(i + 1)); };
-    const hasBoulet = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
-    if (hasBoulet) App.showReveal(ended, true, () => stepPhoto(0)); else stepPhoto(0);
+    const hasJuif = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
+    if (hasJuif) App.showReveal(ended, true, () => stepPhoto(0)); else stepPhoto(0);
   };
 
   /* ---------- Export / import ---------- */
   App.exportAll = () => {
-    const payload = { version: 7, actions: App.actions, votes: App.votes, photos: App.photos, cup: App.cup, contests: App.contests, profiles: App.profiles };
+    const payload = { version: 7, actions: App.actions, votes: App.votes, photos: App.photos, cup: App.cup, profiles: App.profiles };
     const blob = new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "boulet-du-mois.json"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = "Juif-du-mois.json"; a.click();
   };
   /* Import (admin) : ajoute le contenu d'un fichier d'export dans la base. */
   App.importAll = async (text) => {
@@ -670,18 +618,16 @@
   async function loadData() {
     if (!CONFIGURED) throw new Error(NOT_CONFIGURED);
     await refreshSession();
-    // contests et profiles arrivent avec la mise à jour SQL v2 : si elle n'est pas encore faite, le site marche quand même.
+    // profiles arrive avec la mise à jour SQL v2 : si elle n'est pas encore faite, le site marche quand même.
     const optional = (p) => p.catch(() => { App.needsUpdate = true; return []; });
     App.needsUpdate = false;
-    const [acts, votes, photos, cup, contests, profiles] = await Promise.all([
+    const [acts, votes, photos, cup, profiles] = await Promise.all([
       db.select("actions", "select=*&order=ts.asc"),
       db.select("votes", "select=*"),
       db.select("photos", "select=id,who,caption,ts&order=ts.asc"),
       db.select("cup_photos", "select=id,cycle,caption,ts&order=ts.asc"),
-      optional(db.select("contests", "select=*")),
       optional(db.select("profiles", "select=*")),
     ]);
-    App.contests = contests || [];
     App.profiles = {};
     (profiles || []).forEach((p) => { App.profiles[p.who] = p.v; });
     App.actions = acts || [];
@@ -692,48 +638,9 @@
   }
   App.reload = async () => { App.loadError = ""; await loadData(); };
 
-  /* ---------- Actualisation en direct ----------
-     Supabase Realtime prévient le site à chaque changement dans la base : les données sont rechargées
-     et la page se redessine toute seule. Si quelqu'un est en train d'écrire, on attend qu'il ait fini.
-     Filet de sécurité : rechargement toutes les 30 s si le direct n'est pas connecté, et au retour sur l'onglet. */
-  const LIVE = { fns: [], timer: null, pending: false, connected: false };
-  App.live = (fn) => { LIVE.fns.push(fn); };
-  App.isLive = () => LIVE.connected;
-  function busy() {
-    const a = document.activeElement;
-    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "file" && String(a.value || "") !== "") return true;
-    if (App.editing) return true;
-    const r = $("reveal"); if (r && r.classList.contains("show")) return true;
-    const l = $("lightbox"); if (l && l.classList.contains("show")) return true;
-    return false;
-  }
-  const redraw = () => { LIVE.pending = false; LIVE.fns.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); };
-  App.refreshLive = () => new Promise((resolve) => {
-    clearTimeout(LIVE.timer);
-    LIVE.timer = setTimeout(async () => {
-      try { await loadData(); App.loadError = ""; } catch (e) { return resolve(false); }
-      if (busy()) LIVE.pending = true; else redraw();
-      resolve(true);
-    }, 400);
-  });
-  function startLive() {
-    if (!CONFIGURED || App.loadError) return;
-    document.addEventListener("focusout", () => setTimeout(() => { if (LIVE.pending && !busy()) redraw(); }, 300));
-    document.addEventListener("click", () => setTimeout(() => { if (LIVE.pending && !busy()) redraw(); }, 300));
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") App.refreshLive(); });
-    setInterval(() => { if (!LIVE.connected && document.visibilityState === "visible") App.refreshLive(); }, 30000);
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-    s.onload = () => {
-      try {
-        const client = window.supabase.createClient(SB, SBKEY, { auth: { persistSession: false, autoRefreshToken: false } });
-        client.channel("bdm-live")
-          .on("postgres_changes", { event: "*", schema: "public" }, () => App.refreshLive())
-          .subscribe((status) => { LIVE.connected = status === "SUBSCRIBED"; });
-      } catch (e) { LIVE.connected = false; }
-    };
-    document.head.appendChild(s);
-  }
+  /* Pas d'actualisation automatique : les données sont chargées à l'ouverture de la page.
+     App.live est gardé pour compatibilité avec les pages mais ne fait rien. */
+  App.live = () => {};
 
   /* ---------- Mise en place de la page ---------- */
   const LINKS = [
@@ -759,6 +666,5 @@
     }
     $("lightbox").onclick = () => $("lightbox").classList.remove("show");
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("lightbox").classList.remove("show"); });
-    startLive();
   });
 })();
