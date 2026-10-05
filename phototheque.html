@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Photothèque - Juif du mois</title>
+<title>Photothèque - Boulet du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="cup">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Juif du mois</footer>
+  <footer>Boulet du mois</footer>
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
@@ -55,7 +55,7 @@ App.ready.then(function () {
       ? '<span class="muted">Pas encore joué</span>'
       : st === "current"
         ? '<span class="muted">Cycle en cours, élection le ' + App.CYCLE_DAY + '</span>'
-        : (w.names.length ? App.crownInline + '<b>' + esc(w.names.join(" & ")) + '</b>' + (w.max ? ' <span class="muted">· ' + App.plural(w.max, "point") + '</span>' : '') : '<span class="muted">Aucun Juif ce mois-ci</span>');
+        : (w.names.length ? App.crownInline + '<b>' + esc(w.names.join(" & ")) + '</b>' + (w.max ? ' <span class="muted">· ' + App.plural(w.max, "point") + '</span>' : '') : '<span class="muted">Aucun boulet ce mois-ci</span>');
 
     var gallery = shots.length
       ? '<div class="frames ' + (shots.length === 1 ? 'one' : '') + '">' + shots.map(function (c, j) { return frameHTML(c, frame, k, shots.length === 1); }).join("") + '</div>'
@@ -91,7 +91,7 @@ App.ready.then(function () {
         '<div class="hero-trophy">' + TROPHY + '</div>' +
         '<span class="eyebrow">Saison 2026 - 2027</span>' +
         '<h1>Photothèque</h1>' +
-        '<p>Chaque mois, le Juif pose avec la coupe. De septembre à juin.</p>' +
+        '<p>Chaque mois, le Boulet pose avec la coupe. De septembre à juin.</p>' +
       '</section>' +
 
       '<section class="glass">' +
@@ -100,7 +100,7 @@ App.ready.then(function () {
           var st = status(k), w = st === "done" ? App.winnersOf(k).names : [];
           var p = w.length ? App.person(w[0]) : null;
           return '<a class="medal ' + st + '" href="#m-' + k + '">' +
-            '<span class="disc" style="' + (p ? 'background:' + App.grad(p) : '') + '">' + (p ? p.n[0] : st === "current" ? '…' : '') + '</span>' +
+            '<span class="disc' + (p && App.avatarUrl(p.n) ? ' img' : '') + '" style="' + (p ? App.avStyle(p) : '') + '">' + (p ? p.n[0] : st === "current" ? '…' : '') + '</span>' +
             '<span class="mlabel">' + ABBR[+k.split("-")[1] - 1] + '</span>' +
             '<span class="mname">' + (w.length ? esc(w.join(" & ")) : st === "current" ? 'En cours' : '') + '</span>' +
           '</a>';
@@ -154,6 +154,7 @@ App.ready.then(function () {
     document.querySelectorAll("[data-cap]").forEach(function (i) { if (captions[i.dataset.cap]) i.value = captions[i.dataset.cap]; });
   };
   render();
+  App.live(function () { render(); });
   if (location.hash) { var el = document.querySelector(location.hash); if (el) el.scrollIntoView(); }
 });
 </script>

@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin - Juif du mois</title>
+<title>Admin - Boulet du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="admin">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Juif du mois</footer>
+  <footer>Boulet du mois</footer>
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
@@ -41,13 +41,28 @@ App.ready.then(function () {
       html +=
         '<section class="glass" style="text-align:center">' +
           '<h2>Tu es connecté en admin' + (App.adminEmail() ? ' (' + esc(App.adminEmail()) + ')' : '') + '</h2>' +
-          '<p class="muted" style="margin:0 0 18px">Les boutons de suppression apparaissent sur les pages Actions et Photos, l\'ajout de photos dans la Photothèque, et l\'import dans Palmarès.</p>' +
+          '<p class="muted" style="margin:0 0 18px">Sur la page Actions tu peux modifier ou supprimer une action. Les boutons de suppression apparaissent aussi sur Photos, l\'ajout de photos dans la Photothèque, et l\'import dans Palmarès.</p>' +
           '<div class="toolbar" style="justify-content:center">' +
             '<a class="btn" href="phototheque.html">Photothèque</a>' +
             '<a class="btn ghost" href="actions.html">Gérer les actions</a>' +
             '<a class="btn ghost" href="photos.html">Gérer les photos</a>' +
             '<button class="btn ghost" id="logout">Se déconnecter</button>' +
           '</div>' +
+        '</section>' +
+        (App.needsUpdate
+          ? '<div class="notice">La mise à jour de la base n\'est pas encore faite : lance <b>update-v2.sql</b> dans Supabase (SQL Editor) pour activer les contestations, la modification des actions et les photos de profil.</div>'
+          : '') +
+        '<section class="glass">' +
+          '<h2>Photos de profil</h2>' +
+          '<p class="muted" style="margin:-6px 0 16px;font-size:.9rem">Elles s\'affichent partout à la place de l\'initiale. La photo est recadrée en carré automatiquement.</p>' +
+          '<div class="profiles">' + App.PEOPLE.map(function (p) {
+            var has = !!App.avatarUrl(p.n);
+            return '<div class="profile">' + App.av(p) + '<b>' + p.n + '</b>' +
+              '<div class="toolbar">' +
+                '<label class="btn ghost small"><input type="file" accept="image/*" hidden data-avatar="' + p.n + '">' + (has ? 'Changer' : 'Ajouter') + '</label>' +
+                (has ? '<button class="btn ghost small" data-noavatar="' + p.n + '">Retirer</button>' : '') +
+              '</div></div>';
+          }).join("") + '</div>' +
         '</section>';
     } else {
       html +=
@@ -73,6 +88,20 @@ App.ready.then(function () {
       if (ok) { App.toast("Connecté en admin"); render(); }
       else { App.toast("E-mail ou mot de passe incorrect"); $("pw").value = ""; }
     };
+    document.querySelectorAll("[data-avatar]").forEach(function (inp) {
+      inp.onchange = async function () {
+        var f = inp.files[0]; if (!f) return;
+        App.toast("Envoi de la photo...");
+        try { await App.setAvatar(inp.dataset.avatar, f); App.toast("Photo de profil mise à jour"); render(); }
+        catch (e) { App.toast("Erreur : " + e.message); }
+      };
+    });
+    document.querySelectorAll("[data-noavatar]").forEach(function (b) {
+      b.onclick = async function () {
+        if (!confirm("Retirer la photo de " + b.dataset.noavatar + " ?")) return;
+        try { await App.delAvatar(b.dataset.noavatar); render(); } catch (e) { App.toast("Erreur : " + e.message); }
+      };
+    });
     if ($("logout")) $("logout").onclick = function () { App.adminLogout(); App.toast("Déconnecté"); render(); };
   }
   render();

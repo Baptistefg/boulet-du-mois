@@ -1,4 +1,4 @@
-/* Juif du mois - code partagé par toutes les pages */
+/* Boulet du mois - code partagé par toutes les pages */
 (function () {
   "use strict";
   const App = (window.App = {});
@@ -24,14 +24,19 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const person = (n) => PEOPLE.find((p) => p.n === n);
   const grad = (p) => `linear-gradient(135deg, ${p.g[0]}, ${p.g[1]})`;
-  const av = (p) => `<span class="avatar" style="background:${grad(p)}">${p.n[0]}</span>`;
+  /* Avatar : photo de profil si l'admin en a mis une, sinon l'initiale sur un dégradé. */
+  const avStyle = (p) => {
+    const u = App.avatarUrl ? App.avatarUrl(p.n) : "";
+    return u ? `background:${grad(p)};background-image:url('${u}')` : `background:${grad(p)}`;
+  };
+  const av = (p) => `<span class="avatar${App.avatarUrl && App.avatarUrl(p.n) ? " img" : ""}" style="${avStyle(p)}">${p.n[0]}</span>`;
   const CROWN = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 19h20v2H2zM3 7l4 4 5-7 5 7 4-4-2 10H5z"/></svg>`;
   const crownIco = `<span class="crown-ico">${CROWN}</span>`;
   const crownInline = `<span class="crown-inline">${CROWN}</span>`;
   const load = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v === null || v === undefined ? def : v; } catch (e) { return def; } };
   const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const plural = (n, w) => n + " " + w + (n > 1 ? "s" : "");
-  Object.assign(App, { $, esc, person, grad, av, CROWN, crownIco, crownInline, load, store, plural });
+  Object.assign(App, { $, esc, person, grad, av, avStyle, CROWN, crownIco, crownInline, load, store, plural });
 
   function toast(msg) {
     const t = $("toast"); if (!t) return;
@@ -113,6 +118,12 @@
       headers: { "Content-Type": "application/json", Prefer: (onConflict ? "resolution=merge-duplicates," : "") + "return=minimal" },
       body: JSON.stringify(rows),
     }),
+    /* Modifie et vérifie qu'au moins une ligne a vraiment été modifiée (sinon refus des règles de sécurité). */
+    update: async (table, q, fields) => {
+      const rows = await sb("/rest/v1/" + table + "?" + q, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(fields) });
+      if (!rows || !rows.length) throw new Error("Modification refusée par la base (réservé à l'admin)");
+      return rows;
+    },
     /* Supprime et vérifie qu'au moins une ligne a vraiment été supprimée (sinon refus des règles de sécurité). */
     remove: async (table, q, allowNone) => {
       const rows = await sb("/rest/v1/" + table + "?" + q, { method: "DELETE", headers: { Prefer: "return=representation" } });
@@ -160,6 +171,8 @@
   App.votes = {};
   App.photos = [];
   App.cup = [];
+  App.contests = [];   // { action_id, who, ts }
+  App.profiles = {};   // { prénom: version de la photo }
   App.force = {};   // plus de mode test : les photos ne sont jamais dévoilées avant le 25
   App.loadError = "";
 
@@ -180,16 +193,50 @@
     App.actions = App.actions.filter((a) => a.id !== id);
     return true;
   };
+  /* Modification d'une action (admin) : prénom, justification, gravité. */
+  App.updateAction = async (id, fields) => {
+    if (!App.isAdmin()) return false;
+    requireDb();
+    const f = {};
+    if (fields.who && person(fields.who)) f.who = fields.who;
+    if (fields.why !== undefined) { const w = String(fields.why).trim().slice(0, 200); if (!w) throw new Error("La justification est obligatoire"); f.why = w; }
+    if (fields.pts !== undefined) f.pts = Math.min(3, Math.max(1, Number(fields.pts) || 1));
+    await db.update("actions", "id=eq." + encodeURIComponent(id), f);
+    const a = App.actions.find((x) => x.id === id);
+    if (a) Object.assign(a, f);
+    return true;
+  };
   App.actionsOf = (key) => App.actions.filter((a) => cycleKey(new Date(a.ts)) === key).sort((a, b) => b.ts - a.ts);
+
+  /* ---------- Contestations ----------
+     Chacun peut contester une action du cycle en cours (sauf la personne visée).
+     À partir de CONTEST_LIMIT contestations, l'action est annulée et ne rapporte plus de points. */
+  const CONTEST_LIMIT = 3;
+  App.CONTEST_LIMIT = CONTEST_LIMIT;
+  App.contestsOf = (a) => App.contests.filter((c) => c.action_id === a.id && c.who !== a.who).map((c) => c.who);
+  App.isVoided = (a) => App.contestsOf(a).length >= CONTEST_LIMIT;
+  App.canContest = (a, who) => !!who && who !== a.who && cycleKey(new Date(a.ts)) === App.currentKey() && App.contestsOf(a).indexOf(who) < 0;
+  App.contest = async (actionId, who) => {
+    requireDb();
+    const a = App.actions.find((x) => x.id === actionId);
+    if (!a || !person(who)) return false;
+    if (who === a.who) throw new Error("Tu ne peux pas contester ta propre action");
+    if (cycleKey(new Date(a.ts)) !== App.currentKey()) throw new Error("On ne peut contester que les actions du cycle en cours");
+    if (App.contestsOf(a).indexOf(who) >= 0) return false;
+    const c = { action_id: actionId, who, ts: Date.now() };
+    await db.insert("contests", c);
+    App.contests.push(c);
+    return true;
+  };
 
   /* Le score d'un cycle = somme des points de gravité (1 à 3) des mauvaises actions. */
   App.scoresFor = (key) => {
     const s = Object.fromEntries(PEOPLE.map((p) => [p.n, 0]));
-    App.actions.forEach((a) => { if (cycleKey(new Date(a.ts)) === key && a.who in s) s[a.who] += ptsOf(a); });
+    App.actions.forEach((a) => { if (cycleKey(new Date(a.ts)) === key && a.who in s && !App.isVoided(a)) s[a.who] += ptsOf(a); });
     return s;
   };
   App.totalPoints = (key) => Object.values(App.scoresFor(key)).reduce((a, b) => a + b, 0);
-  /* Le Juif du mois est celui qui a le plus de points de gravité sur le cycle, sans aucun vote.
+  /* Le Boulet du mois est celui qui a le plus de points de gravité sur le cycle, sans aucun vote.
      Seule exception : septembre 2026, élu avant la création du site, inscrit ici pour l'historique. */
   const FIXED = { "2026-09": { names: ["Titouan"], note: "Élu entre nous avant la création du site." } };
   App.FIXED = FIXED;
@@ -202,16 +249,19 @@
   };
 
   /* ---------- Images ---------- */
-  function compress(file, max, q) {
+  function compress(file, max, q, square) {
     max = max || 1280; q = q || 0.8;
     return new Promise((res, rej) => {
       const url = URL.createObjectURL(file), img = new Image();
       img.onload = () => {
-        let w = img.naturalWidth, h = img.naturalHeight;
-        const s = Math.min(1, max / Math.max(w, h));
-        w = Math.round(w * s); h = Math.round(h * s);
+        const W = img.naturalWidth, H = img.naturalHeight;
+        // square : recadrage carré centré (photos de profil)
+        const side = Math.min(W, H), sx = square ? (W - side) / 2 : 0, sy = square ? (H - side) / 2 : 0;
+        const sw = square ? side : W, sh = square ? side : H;
+        const s = Math.min(1, max / Math.max(sw, sh));
+        const w = Math.round(sw * s), h = Math.round(sh * s);
         const c = document.createElement("canvas"); c.width = w; c.height = h;
-        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
         URL.revokeObjectURL(url);
         res(c.toDataURL("image/jpeg", q));
       };
@@ -273,6 +323,33 @@
     await db.remove("cup_photos", "id=eq." + encodeURIComponent(id));
     await files.remove("coupe", id + ".jpg");
     App.cup = App.cup.filter((c) => c.id !== id);
+    return true;
+  };
+
+  /* ---------- Photos de profil (admin uniquement) ----------
+     Une photo carrée par personne, stockée dans le bucket "avatars" sous le nom Prénom-version.jpg. */
+  App.avatarUrl = (who) => (App.profiles[who] ? bucketUrl("avatars", encodeURIComponent(who) + "-" + App.profiles[who] + ".jpg") : "");
+  App.setAvatar = async (who, file) => {
+    requireDb();
+    if (!App.isAdmin()) throw new Error("Réservé à l'admin");
+    if (!person(who)) throw new Error("Prénom inconnu");
+    checkImage(file);
+    const data = await compress(file, 400, 0.85, true);
+    const v = Date.now(), old = App.profiles[who];
+    await files.put("avatars", encodeURIComponent(who) + "-" + v + ".jpg", dataUrlToBlob(data));
+    await db.insert("profiles", { who, v }, "who");
+    if (old) files.remove("avatars", encodeURIComponent(who) + "-" + old + ".jpg");
+    App.profiles[who] = v;
+    return true;
+  };
+  App.delAvatar = async (who) => {
+    requireDb();
+    if (!App.isAdmin()) return false;
+    const old = App.profiles[who];
+    if (!old) return false;
+    await db.remove("profiles", "who=eq." + encodeURIComponent(who));
+    files.remove("avatars", encodeURIComponent(who) + "-" + old + ".jpg");
+    delete App.profiles[who];
     return true;
   };
 
@@ -358,14 +435,100 @@
         <div class="ct">${s[p.n]}${opts.unit ? ` <small>${opts.unit}${s[p.n] > 1 ? "s" : ""}</small>` : ""}</div></div>`;
     }).join("");
   };
-  App.actionItemHTML = (a, withDel) => {
+  /* Une action dans une liste. interactive = boutons contester / modifier / supprimer (page Actions). */
+  App.editing = null;   // id de l'action en cours de modification (admin)
+  App.actionItemHTML = (a, interactive) => {
     const p = person(a.who) || PEOPLE[0];
     const pts = ptsOf(a);
-    return `<div class="item">${av(p)}
-      <div class="body"><div class="who">${esc(a.who)}<span class="pts p${pts}">${pts} pt${pts > 1 ? "s" : ""}</span></div><div class="why">${esc(a.why)}</div></div>
-      <div><div class="dt">${new Date(a.ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</div>
-      ${withDel && App.isAdmin() ? `<div style="text-align:right"><button class="x" data-del="${a.id}" title="Supprimer (admin)">×</button></div>` : ""}</div>
+    const voided = App.isVoided(a);
+    const contesters = App.contestsOf(a);
+    const date = new Date(a.ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+    if (interactive && App.editing === a.id && App.isAdmin()) {
+      return `<div class="item editing" data-item="${a.id}">
+        <div class="edit-form">
+          <div class="pick">${PEOPLE.map((x) => `<button type="button" class="chip ${x.n === a.who ? "on" : ""}" data-ewho="${x.n}">${av(x)}${x.n}</button>`).join("")}</div>
+          <div class="sev"><span class="lbl">Gravité</span>${[1, 2, 3].map((n) => `<button type="button" class="s${n} ${n === pts ? "on" : ""}" data-epts="${n}">${n} pt${n > 1 ? "s" : ""}</button>`).join("")}</div>
+          <div class="row-input">
+            <input type="text" data-ewhy maxlength="200" value="${esc(a.why)}">
+            <button class="btn small" data-esave="${a.id}">Enregistrer</button>
+            <button class="btn ghost small" data-ecancel>Annuler</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    const voter = App.getVoter();
+    let contestUI = "";
+    if (contesters.length || (interactive && cycleKey(new Date(a.ts)) === App.currentKey())) {
+      const count = `<span class="contest-count${voided ? " voided" : ""}" title="${esc(contesters.join(", "))}">${voided ? "Annulée" : contesters.length + "/" + CONTEST_LIMIT + " contestation" + (contesters.length > 1 ? "s" : "")}</span>`;
+      let btn = "";
+      if (interactive && !voided) {
+        if (!voter) btn = "";
+        else if (voter === a.who) btn = "";
+        else if (contesters.indexOf(voter) >= 0) btn = `<span class="contest-done">Tu as contesté</span>`;
+        else if (App.canContest(a, voter)) btn = `<button class="contest-btn" data-contest="${a.id}">Je conteste</button>`;
+      }
+      contestUI = `<div class="contest">${contesters.length || voided ? count : ""}${btn}</div>`;
+    }
+
+    const admin = interactive && App.isAdmin()
+      ? `<div class="admin-act"><button class="mini" data-edit="${a.id}">Modifier</button><button class="x" data-del="${a.id}" title="Supprimer (admin)">×</button></div>`
+      : "";
+    return `<div class="item${voided ? " voided" : ""}" data-item="${a.id}">${av(p)}
+      <div class="body">
+        <div class="who">${esc(a.who)}<span class="pts p${pts}">${pts} pt${pts > 1 ? "s" : ""}</span></div>
+        <div class="why">${esc(a.why)}</div>
+        ${contestUI}
+      </div>
+      <div><div class="dt">${date}</div>${admin}</div>
     </div>`;
+  };
+
+  /* Branche les boutons d'une liste d'actions (contester, modifier, supprimer). */
+  App.bindActionItems = (rerender) => {
+    document.querySelectorAll("[data-contest]").forEach((b) => {
+      b.onclick = async () => {
+        const who = App.getVoter();
+        if (!who) { toast("Choisis d'abord qui tu es"); return; }
+        b.disabled = true;
+        try {
+          await App.contest(b.dataset.contest, who);
+          const a = App.actions.find((x) => x.id === b.dataset.contest);
+          toast(a && App.isVoided(a) ? "Action annulée : " + CONTEST_LIMIT + " contestations" : "Contestation enregistrée");
+          rerender();
+        } catch (e) { b.disabled = false; toast("Erreur : " + e.message); }
+      };
+    });
+    document.querySelectorAll("[data-del]").forEach((b) => {
+      if (!b.closest("[data-item]")) return;
+      b.onclick = async () => {
+        if (!App.isAdmin()) { toast("Réservé à l'admin"); rerender(); return; }
+        if (!confirm("Supprimer cette action ?")) return;
+        try { await App.delAction(b.dataset.del); rerender(); } catch (e) { toast("Erreur : " + e.message); }
+      };
+    });
+    document.querySelectorAll("[data-edit]").forEach((b) => { b.onclick = () => { App.editing = b.dataset.edit; rerender(); }; });
+    const form = document.querySelector(".item.editing");
+    if (form) {
+      const st = { who: null, pts: null };
+      form.querySelectorAll("[data-ewho]").forEach((c) => c.onclick = () => {
+        st.who = c.dataset.ewho; form.querySelectorAll("[data-ewho]").forEach((x) => x.classList.toggle("on", x === c));
+      });
+      form.querySelectorAll("[data-epts]").forEach((c) => c.onclick = () => {
+        st.pts = Number(c.dataset.epts); form.querySelectorAll("[data-epts]").forEach((x) => x.classList.toggle("on", x === c));
+      });
+      form.querySelector("[data-ecancel]").onclick = () => { App.editing = null; rerender(); };
+      form.querySelector("[data-esave]").onclick = async (e) => {
+        const btn = e.currentTarget; btn.disabled = true;
+        const f = { why: form.querySelector("[data-ewhy]").value };
+        if (st.who) f.who = st.who;
+        if (st.pts) f.pts = st.pts;
+        try { await App.updateAction(btn.dataset.esave, f); App.editing = null; toast("Action modifiée"); rerender(); }
+        catch (err) { btn.disabled = false; toast("Erreur : " + err.message); }
+      };
+      const inp = form.querySelector("[data-ewhy]"); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
   };
   App.cycleOptions = (selected, extraKeys) => {
     const cur = App.currentKey();
@@ -436,9 +599,9 @@
       simpleOverlay(`<div class="rm">${monthName(key)}</div><div class="rt">Personne n'a rien fait de mal ce mois-ci. Suspect.</div>`, finish);
       return;
     }
-    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Juif du mois est…</div>`;
+    const head = `<div class="spot"></div><div class="rm">${monthName(key)}</div><div class="rt">Le Boulet du mois est…</div>`;
     const ps = r.names.map(person).filter(Boolean);
-    const mid = `<div class="avs">${ps.map((p) => `<div class="av" style="background:${grad(p)}">${p.n[0]}</div>`).join("")}</div>
+    const mid = `<div class="avs">${ps.map((p) => `<div class="av${App.avatarUrl(p.n) ? " img" : ""}" style="${avStyle(p)}">${p.n[0]}</div>`).join("")}</div>
       <div class="nm">${crownInline}${r.names.join(" & ")}</div>
       <div class="sb">${r.note ? "« " + esc(r.note) + " »" : (r.max ? plural(r.max, "point") + " sur ce cycle. " : "") + "Félicitations (ou pas)."}</div>`;
     overlay(head, mid, finish);
@@ -461,22 +624,22 @@
   };
 
   /* Annonces automatiques (une seule fois par navigateur) :
-     - le 25 : le Juif du cycle qui vient de se terminer ;
+     - le 25 : le Boulet du cycle qui vient de se terminer ;
      - à partir du 26 : la photo gagnante, une fois le vote du 25 terminé. */
   App.checkReveals = () => {
     const ended = prevKey(App.currentKey());
     const photoKeys = [prevKey(ended), ended].filter((k) => App.resultsVisible(k) && App.photoResults(k).winners.length > 0 && !wasSeen("p-" + k));
     const stepPhoto = (i) => { if (i < photoKeys.length) App.showPhotoReveal(photoKeys[i], true, () => stepPhoto(i + 1)); };
-    const hasJuif = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
-    if (hasJuif) App.showReveal(ended, true, () => stepPhoto(0)); else stepPhoto(0);
+    const hasBoulet = App.winnersOf(ended).names.length > 0 && !wasSeen(ended);
+    if (hasBoulet) App.showReveal(ended, true, () => stepPhoto(0)); else stepPhoto(0);
   };
 
   /* ---------- Export / import ---------- */
   App.exportAll = () => {
-    const payload = { version: 6, actions: App.actions, votes: App.votes, photos: App.photos, cup: App.cup };
+    const payload = { version: 7, actions: App.actions, votes: App.votes, photos: App.photos, cup: App.cup, contests: App.contests, profiles: App.profiles };
     const blob = new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "Juif-du-mois.json"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = "boulet-du-mois.json"; a.click();
   };
   /* Import (admin) : ajoute le contenu d'un fichier d'export dans la base. */
   App.importAll = async (text) => {
@@ -507,12 +670,20 @@
   async function loadData() {
     if (!CONFIGURED) throw new Error(NOT_CONFIGURED);
     await refreshSession();
-    const [acts, votes, photos, cup] = await Promise.all([
+    // contests et profiles arrivent avec la mise à jour SQL v2 : si elle n'est pas encore faite, le site marche quand même.
+    const optional = (p) => p.catch(() => { App.needsUpdate = true; return []; });
+    App.needsUpdate = false;
+    const [acts, votes, photos, cup, contests, profiles] = await Promise.all([
       db.select("actions", "select=*&order=ts.asc"),
       db.select("votes", "select=*"),
       db.select("photos", "select=id,who,caption,ts&order=ts.asc"),
       db.select("cup_photos", "select=id,cycle,caption,ts&order=ts.asc"),
+      optional(db.select("contests", "select=*")),
+      optional(db.select("profiles", "select=*")),
     ]);
+    App.contests = contests || [];
+    App.profiles = {};
+    (profiles || []).forEach((p) => { App.profiles[p.who] = p.v; });
     App.actions = acts || [];
     App.votes = {};
     (votes || []).forEach((v) => { (App.votes[v.cycle] = App.votes[v.cycle] || {})[v.voter] = v.photo_id; });
@@ -520,6 +691,49 @@
     App.cup = (cup || []).map((c) => Object.assign({}, c, { data: bucketUrl("coupe", c.id + ".jpg") }));
   }
   App.reload = async () => { App.loadError = ""; await loadData(); };
+
+  /* ---------- Actualisation en direct ----------
+     Supabase Realtime prévient le site à chaque changement dans la base : les données sont rechargées
+     et la page se redessine toute seule. Si quelqu'un est en train d'écrire, on attend qu'il ait fini.
+     Filet de sécurité : rechargement toutes les 30 s si le direct n'est pas connecté, et au retour sur l'onglet. */
+  const LIVE = { fns: [], timer: null, pending: false, connected: false };
+  App.live = (fn) => { LIVE.fns.push(fn); };
+  App.isLive = () => LIVE.connected;
+  function busy() {
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "file" && String(a.value || "") !== "") return true;
+    if (App.editing) return true;
+    const r = $("reveal"); if (r && r.classList.contains("show")) return true;
+    const l = $("lightbox"); if (l && l.classList.contains("show")) return true;
+    return false;
+  }
+  const redraw = () => { LIVE.pending = false; LIVE.fns.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); };
+  App.refreshLive = () => new Promise((resolve) => {
+    clearTimeout(LIVE.timer);
+    LIVE.timer = setTimeout(async () => {
+      try { await loadData(); App.loadError = ""; } catch (e) { return resolve(false); }
+      if (busy()) LIVE.pending = true; else redraw();
+      resolve(true);
+    }, 400);
+  });
+  function startLive() {
+    if (!CONFIGURED || App.loadError) return;
+    document.addEventListener("focusout", () => setTimeout(() => { if (LIVE.pending && !busy()) redraw(); }, 300));
+    document.addEventListener("click", () => setTimeout(() => { if (LIVE.pending && !busy()) redraw(); }, 300));
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") App.refreshLive(); });
+    setInterval(() => { if (!LIVE.connected && document.visibilityState === "visible") App.refreshLive(); }, 30000);
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+    s.onload = () => {
+      try {
+        const client = window.supabase.createClient(SB, SBKEY, { auth: { persistSession: false, autoRefreshToken: false } });
+        client.channel("bdm-live")
+          .on("postgres_changes", { event: "*", schema: "public" }, () => App.refreshLive())
+          .subscribe((status) => { LIVE.connected = status === "SUBSCRIBED"; });
+      } catch (e) { LIVE.connected = false; }
+    };
+    document.head.appendChild(s);
+  }
 
   /* ---------- Mise en place de la page ---------- */
   const LINKS = [
@@ -545,5 +759,6 @@
     }
     $("lightbox").onclick = () => $("lightbox").classList.remove("show");
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("lightbox").classList.remove("show"); });
+    startLive();
   });
 })();
