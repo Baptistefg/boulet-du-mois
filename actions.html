@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Actions - Boulet du mois</title>
+<title>Actions - Juif du mois</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="actions">
 <div class="wrap">
   <nav id="nav"></nav>
   <main id="app"></main>
-  <footer>Boulet du mois</footer>
+  <footer>Juif du mois</footer>
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
@@ -34,7 +34,7 @@ App.ready.then(function () {
       '<section class="hero">' +
         '<span class="eyebrow">Mauvaises actions</span>' +
         '<h1>Actions</h1>' +
-        '<p>Chaque action a une justification et une gravité de 1 à 3 points. Le Boulet du mois est celui qui a le plus de points.</p>' +
+        '<p>Chaque action a une justification et une gravité de 1 à 3 points. Le Juif du mois est celui qui a le plus de points.</p>' +
       '</section>' +
 
       (isCur
@@ -56,12 +56,6 @@ App.ready.then(function () {
       '<section class="glass">' +
         '<div class="head-row"><h2>Historique</h2>' + App.cycleOptions(viewKey) + '</div>' +
         '<p class="muted" style="margin:-8px 0 14px;font-size:.9rem">Cycle ' + App.cycleRange(viewKey) + '. ' + App.plural(all.length, "action") + ', ' + App.plural(App.totalPoints(viewKey), "point") + '.' + (App.isAdmin() ? '' : ' Seul l\'admin peut modifier ou supprimer une action.') + '</p>' +
-        (isCur
-          ? '<div class="notice" style="font-size:.9rem">Une action abusée ? Choisis qui tu es, puis clique sur <b>Je conteste</b>. À ' + App.CONTEST_LIMIT + ' contestations, l\'action est annulée et ne compte plus. La personne visée ne peut pas contester sa propre action.' +
-              '<div class="pick" style="margin:12px 0 0">' + App.PEOPLE.map(function (p) {
-                return '<button type="button" class="chip ' + (App.getVoter() === p.n ? 'on' : '') + '" data-voter="' + p.n + '">' + App.av(p) + p.n + '</button>';
-              }).join("") + '</div></div>'
-          : '') +
         '<div class="tabs">' +
           '<button class="tab ' + (filter === "all" ? "on" : "") + '" data-f="all">Tous</button>' +
           App.PEOPLE.map(function (p) {
@@ -79,7 +73,6 @@ App.ready.then(function () {
         document.querySelectorAll("[data-who]").forEach(function (x) { x.classList.toggle("on", x.dataset.who === formWho); });
       };
     });
-    document.querySelectorAll("[data-voter]").forEach(function (c) { c.onclick = function () { App.setVoter(c.dataset.voter); render(); }; });
     document.querySelectorAll("[data-pts]").forEach(function (b) {
       b.onclick = function () {
         formPts = Number(b.dataset.pts);
