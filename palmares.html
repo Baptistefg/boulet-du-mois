@@ -60,7 +60,7 @@ App.ready.then(function () {
       '<section class="glass">' +
         '<h2>Outils</h2>' +
         '<div class="toolbar">' +
-          '<button class="btn ghost" id="pb">Tester l\'animation Juif (cycle en cours)</button>' +
+          (App.isAdmin() ? '<button class="btn ghost" id="pb">Tester l\'animation Juif (cycle en cours)</button>' : '') +
           (lastPhotoKey ? '<button class="btn ghost" id="pp">Revoir l\'annonce de la dernière photo du mois</button>' : '') +
           '<button class="btn ghost" id="exp">Exporter les données</button>' +
           (App.isAdmin() ? '<button class="btn ghost" id="imp">Importer des données</button>' : '') +
@@ -76,7 +76,7 @@ App.ready.then(function () {
         if (p) App.lightbox(p.data, p.who + (p.caption ? " : " + p.caption : ""));
       };
     });
-    $("pb").onclick = function () { App.showReveal(App.currentKey(), false, render); };
+    if ($("pb")) $("pb").onclick = function () { App.showReveal(App.currentKey(), false, render); };
     if ($("pp")) $("pp").onclick = function () { App.showPhotoReveal(lastPhotoKey, false, render); };
     $("exp").onclick = App.exportAll;
     if ($("imp")) $("imp").onclick = function () { $("file").click(); };
