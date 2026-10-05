@@ -125,10 +125,6 @@ App.ready.then(function () {
     }
     html += '</section>';
 
-    html += '<section class="glass"><h2>Test</h2><div class="toolbar">' +
-      '<button class="btn ghost" id="force">' + (App.force[cur] ? 'Quitter le mode test' : 'Mode test : dévoiler et voter maintenant') + '</button>' +
-      '<span class="muted" style="font-size:.85rem">Pour essayer le vote avant le ' + App.CYCLE_DAY + ' (dévoile les photos du cycle en cours sur cet appareil).</span></div></section>';
-
     $("app").innerHTML = html;
 
     $("cycleSel").onchange = function () { viewKey = this.value; render(); };
@@ -161,10 +157,6 @@ App.ready.then(function () {
       viewKey = App.currentKey();   // on montre le cycle en cours pour voir la photo déposée (cachée)
       render();
       App.toast(err ? (ok ? ok + " ajoutée(s). " : "") + err : App.plural(ok, "photo") + " ajoutée" + (ok > 1 ? "s" : "") + " pour " + uploader + " (cachée jusqu'au " + App.CYCLE_DAY + ")");
-    };
-    $("force").onclick = function () {
-      if (App.force[cur]) delete App.force[cur]; else App.force[cur] = true;
-      App.saveForce(); render();
     };
 
     // Vote
