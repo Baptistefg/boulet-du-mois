@@ -14,7 +14,7 @@
   const CYCLE_DAY = 25;   // le cycle change et la révélation a lieu le 25
   const MAX_PHOTOS = 3;   // photos max par personne et par cycle
   const K = {
-    seen: "bdm-seen-v3-", force: "bdm-voteforce-v1", voter: "bdm-voter-v1",
+    seen: "bdm-seen-v3-", voter: "bdm-voter-v1",
   };
   const MONTHS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
   Object.assign(App, { PEOPLE, CYCLE_DAY, MAX_PHOTOS, MONTHS });
@@ -160,9 +160,8 @@
   App.votes = {};
   App.photos = [];
   App.cup = [];
-  App.force = load(K.force, {});
+  App.force = {};   // plus de mode test : les photos ne sont jamais dévoilées avant le 25
   App.loadError = "";
-  App.saveForce = () => store(K.force, App.force);
 
   const ptsOf = (a) => Math.min(3, Math.max(1, Number(a.pts) || 1));
   App.ptsOf = ptsOf;
